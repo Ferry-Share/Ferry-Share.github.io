@@ -74,19 +74,37 @@ jobs:
           # reason rather than midway through a deploy. The token goes in a
           # config file rather than the command line, to keep it out of argv.
           printf 'header = "Authorization: Bearer %s"\n' "$CLOUDFLARE_API_TOKEN" > .curlrc
-          status=$(curl -sS --config .curlrc -o verify.json -w '%{http_code}' \
-            https://api.cloudflare.com/client/v4/user/tokens/verify || echo 000)
+
+          verify() {
+            curl -sS --config .curlrc -o verify.json -w '%{http_code}' "$1" || echo 000
+          }
+
+          # Cloudflare issues two kinds of token and each is verified in its
+          # own place. A user token (My Profile -> API Tokens, which is what
+          # the "Edit Cloudflare Workers" template creates) answers on /user;
+          # an account-owned token answers only on its account. Checking just
+          # the first would call a perfectly good account token invalid.
+          status=$(verify https://api.cloudflare.com/client/v4/user/tokens/verify)
+          scope="user"
+
+          if [ "$status" != "200" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            status=$(verify "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify")
+            scope="account"
+          fi
           rm -f .curlrc
 
           if [ "$status" != "200" ]; then
-            echo "::error::Cloudflare rejected the token (HTTP $status). Its reply:"
+            echo "::error::Cloudflare rejected the token (HTTP $status on the $scope endpoint). Its reply:"
             cat verify.json || true
             echo
-            echo "::error::Create a fresh API Token from the 'Edit Cloudflare Workers' template and update the CLOUDFLARE_API_TOKEN secret. Note this is an API *Token*, not the Global API Key, and not the account id."
+            if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+              echo "::notice::Only the user endpoint was tried. If this is an account-owned token, also set the CLOUDFLARE_ACCOUNT_ID secret so it can be checked against its account."
+            fi
+            echo "::error::Create the token from Cloudflare's 'Edit Cloudflare Workers' template, under My Profile -> API Tokens. It must be an API Token — not the Global API Key, not the account id, and not an R2 token, which carries object-storage permissions and cannot deploy a Worker."
             exit 1
           fi
 
-          echo "Token accepted by Cloudflare."
+          echo "Token accepted by Cloudflare (verified as a $scope token)."
 
       # The Worker has no dependencies of its own, so this is wrangler alone.
       # Pinned to a major version: an unpinned tool that deploys to production
