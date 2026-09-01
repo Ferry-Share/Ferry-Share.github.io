@@ -290,8 +290,8 @@ function SettingsForm({ onClose }: { onClose: () => void }) {
         />
         <p className="mt-1.5 text-[13px] text-hull-500 dark:text-hull-400">
           The relay introduces the two devices. It never sees your code or
-          your data. Point this at your own if you would rather not use the
-          default.
+          your data. Leave this blank to use the one shown above, or point it
+          at your own.
         </p>
       </div>
 

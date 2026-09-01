@@ -200,16 +200,31 @@ than the whole front-end toolchain.
 **Your own server** — `PORT=8081 node server/relay.js` behind nginx or Caddy
 with a WebSocket upgrade on `/ws`.
 
-Then tell the front end where it is, or nobody will be able to pair: with no
-relay configured, Settings shows an empty **Relay address** field and starting
-a crossing fails. Two ways to fill it:
+Then tell the front end where it is. Ferry already ships with a working relay
+as its default, so it pairs out of the box; you only need this if you would
+rather run your own.
 
 - **For everyone** — set a repository variable named `NEXT_PUBLIC_RELAY_URL`
   (Settings → Secrets and variables → Actions → **Variables**, not Secrets) to
-  your `wss://…/ws` address, then re-run the Pages workflow. The address is
-  baked into the build, so every visitor gets it.
+  your `wss://…/ws` address, then re-run the Pages workflow. It is baked into
+  the build, so every visitor gets it, and no source file has to change.
 - **Just for you** — paste it into **Settings → Relay address** in the app. It
   is remembered in that browser only.
+
+### Which relay a browser talks to
+
+Highest priority wins:
+
+1. Whatever that browser saved under **Settings → Relay address**.
+2. The origin the page came from, when it can host a relay — `npm run lan` and
+   self-hosted deployments serve one at `/ws`, and reaching past it would
+   defeat the point of running it.
+3. `NEXT_PUBLIC_RELAY_URL`, baked in at build time.
+4. The relay Ferry ships with, in `src/lib/config.ts`.
+
+The relay address is not a secret and the relay is not privileged: it only
+ever sees a truncated hash of the PIN, and every payload is sealed with a key
+derived from that PIN, which it never learns.
 
 > Free Render and Fly instances sleep when idle, so the first pairing after a
 > quiet spell waits for the relay to wake — commonly half a minute on Render.
@@ -253,6 +268,7 @@ test/
   relay.test.js        pairing, forwarding, room limits, bad frames
   lan.test.js          the LAN host serves ./out and nothing else
   worker.test.mjs      the Worker relay matches the Node one, and routing
+  config.test.mjs      which relay a browser ends up talking to
 ```
 
 ## Behaviour worth knowing
