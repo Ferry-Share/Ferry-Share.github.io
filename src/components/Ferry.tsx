@@ -15,6 +15,9 @@ import { Button, Icon, Sheet, ToastHost, useToast } from "./ui";
 import { Pairing } from "./Pairing";
 import { Workspace } from "./Workspace";
 
+const LOGO_URL =
+  "https://res.cloudinary.com/dkj22lm1g/image/upload/v1788291772/Ferry_zs4ns4.webp";
+
 export default function Ferry() {
   return (
     <ToastHost>
@@ -109,7 +112,7 @@ function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <header className="flex items-center justify-between gap-4 py-5 sm:py-7">
       <a href="#main" className="flex items-center gap-2.5">
-        <Wordmark />
+        <AppLogo />
         <span className="font-display text-[19px] font-bold tracking-tight text-hull-900 dark:text-fog-100">
           Ferry
         </span>
@@ -128,19 +131,9 @@ function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
   );
 }
 
-function Wordmark() {
+function AppLogo() {
   return (
-    <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
-      <rect width="28" height="28" rx="8" className="fill-hull-900 dark:fill-fog-100" />
-      <path
-        d="M7 17.5h14M8.5 17.5l1.6-4.8h7.8l1.6 4.8M11.5 12.7V8.6h5v4.1"
-        fill="none"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="stroke-signal-400"
-      />
-    </svg>
+    <img src={LOGO_URL} alt="Ferry logo" className="h-8 w-8 rounded-lg object-cover" />
   );
 }
 
@@ -169,8 +162,8 @@ function Hero() {
       </h1>
       <p className="mt-4 max-w-prose text-[17px] text-hull-600 dark:text-hull-300">
         A password, a paragraph, a file. Ferry moves it across in a couple of
-        seconds, encrypted the whole way, and keeps nothing once you close the
-        tab.
+        seconds for people in Sri Lanka and everywhere else, encrypted the
+        whole way, and keeps nothing once you close the tab.
       </p>
     </section>
   );
