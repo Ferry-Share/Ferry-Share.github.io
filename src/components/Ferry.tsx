@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/hooks/useSession";
 import { normalizePin, PIN_LENGTH } from "@/lib/crypto";
 import {
@@ -23,19 +23,38 @@ export default function Ferry() {
   );
 }
 
+/**
+ * A shared invite arrives as `#p=CODE`. Returns the normalised code, or null
+ * when the fragment holds none — including when it is not decodable, which
+ * would otherwise throw.
+ */
+function pinFromHash(): string | null {
+  if (typeof window === "undefined") return null;
+  const match = /[#&]p=([^&]+)/.exec(window.location.hash);
+  if (!match) return null;
+  try {
+    return normalizePin(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
+}
+
 function Shell() {
   const { session, state } = useSession();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [autoPin, setAutoPin] = useState<string | null>(null);
   const toast = useToast();
 
-  // A shared invite arrives as #p=CODE. Read it, then scrub it from the bar so
-  // the secret does not sit in the address field or in browser history.
+  // Read before first paint rather than in an effect, so pairing does not wait
+  // on a second render.
+  const [autoPin] = useState<string | null>(() => {
+    const pin = pinFromHash();
+    return pin?.length === PIN_LENGTH ? pin : null;
+  });
+
+  // Then scrub the code out of the address bar so the one secret in the whole
+  // system does not sit there or in browser history.
   useEffect(() => {
-    const match = /[#&]p=([^&]+)/.exec(window.location.hash);
-    if (!match) return;
-    const pin = normalizePin(decodeURIComponent(match[1]));
-    if (pin.length === PIN_LENGTH) setAutoPin(pin);
+    if (pinFromHash() === null) return;
     history.replaceState(null, "", window.location.pathname + window.location.search);
   }, []);
 
@@ -72,11 +91,13 @@ function Shell() {
 /* ------------------------------------------------------------------ */
 
 function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
+  // The inline script in the document head has already applied the saved
+  // theme, so the class on <html> is the source of truth to start from.
+  const [dark, setDark] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("dark"),
+  );
 
   const toggle = () => {
     const next = !dark;
@@ -220,20 +241,23 @@ function Footer({ onOpenSettings }: { onOpenSettings: () => void }) {
 /* ------------------------------------------------------------------ */
 
 function Settings({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [relay, setRelay] = useState("");
-  const [turnUrls, setTurnUrls] = useState("");
-  const [turnUser, setTurnUser] = useState("");
-  const [turnPass, setTurnPass] = useState("");
-  const toast = useToast();
+  return (
+    <Sheet open={open} title="Relay and network" onClose={onClose}>
+      {/* The sheet renders nothing while closed, so the form below mounts
+          fresh on every open and reads what is stored as its initial state.
+          No effect is needed to keep the two in step. */}
+      <SettingsForm onClose={onClose} />
+    </Sheet>
+  );
+}
 
-  useEffect(() => {
-    if (!open) return;
-    setRelay(getRelayUrl());
-    const turn = getTurnConfig();
-    setTurnUrls(turn?.urls ?? "");
-    setTurnUser(turn?.username ?? "");
-    setTurnPass(turn?.credential ?? "");
-  }, [open]);
+function SettingsForm({ onClose }: { onClose: () => void }) {
+  const stored = useMemo(() => getTurnConfig(), []);
+  const [relay, setRelay] = useState(getRelayUrl);
+  const [turnUrls, setTurnUrls] = useState(stored?.urls ?? "");
+  const [turnUser, setTurnUser] = useState(stored?.username ?? "");
+  const [turnPass, setTurnPass] = useState(stored?.credential ?? "");
+  const toast = useToast();
 
   const save = () => {
     if (relay && !isValidRelayUrl(relay)) {
@@ -251,74 +275,72 @@ function Settings({ open, onClose }: { open: boolean; onClose: () => void }) {
   };
 
   return (
-    <Sheet open={open} title="Relay and network" onClose={onClose}>
-      <div className="space-y-5">
-        <div>
-          <label htmlFor="relay-url" className="mb-1.5 block text-sm font-medium">
-            Relay address
-          </label>
+    <div className="space-y-5">
+      <div>
+        <label htmlFor="relay-url" className="mb-1.5 block text-sm font-medium">
+          Relay address
+        </label>
+        <input
+          id="relay-url"
+          value={relay}
+          onChange={(event) => setRelay(event.target.value)}
+          placeholder={defaultRelayUrl() || "wss://your-relay.example.com/ws"}
+          spellCheck={false}
+          className="field font-mono text-[13.5px]"
+        />
+        <p className="mt-1.5 text-[13px] text-hull-500 dark:text-hull-400">
+          The relay introduces the two devices. It never sees your code or
+          your data. Point this at your own if you would rather not use the
+          default.
+        </p>
+      </div>
+
+      <details className="rounded-xl bg-fog-100 p-4 dark:bg-hull-950">
+        <summary className="cursor-pointer text-sm font-medium">
+          TURN server (only for stubborn networks)
+        </summary>
+        <div className="mt-4 space-y-3">
           <input
-            id="relay-url"
-            value={relay}
-            onChange={(event) => setRelay(event.target.value)}
-            placeholder={defaultRelayUrl() || "wss://your-relay.example.com/ws"}
+            value={turnUrls}
+            onChange={(event) => setTurnUrls(event.target.value)}
+            placeholder="turn:turn.example.com:3478"
             spellCheck={false}
+            aria-label="TURN server address"
             className="field font-mono text-[13.5px]"
           />
-          <p className="mt-1.5 text-[13px] text-hull-500 dark:text-hull-400">
-            The relay introduces the two devices. It never sees your code or
-            your data. Point this at your own if you would rather not use the
-            default.
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              value={turnUser}
+              onChange={(event) => setTurnUser(event.target.value)}
+              placeholder="Username"
+              aria-label="TURN username"
+              className="field text-[13.5px]"
+            />
+            <input
+              value={turnPass}
+              onChange={(event) => setTurnPass(event.target.value)}
+              placeholder="Credential"
+              type="password"
+              aria-label="TURN credential"
+              className="field text-[13.5px]"
+            />
+          </div>
+          <p className="text-[13px] text-hull-500 dark:text-hull-400">
+            Without TURN, a few restrictive networks cannot form a direct
+            link. Ferry falls back to the relay in that case, which is still
+            end-to-end encrypted but slower.
           </p>
         </div>
+      </details>
 
-        <details className="rounded-xl bg-fog-100 p-4 dark:bg-hull-950">
-          <summary className="cursor-pointer text-sm font-medium">
-            TURN server (only for stubborn networks)
-          </summary>
-          <div className="mt-4 space-y-3">
-            <input
-              value={turnUrls}
-              onChange={(event) => setTurnUrls(event.target.value)}
-              placeholder="turn:turn.example.com:3478"
-              spellCheck={false}
-              aria-label="TURN server address"
-              className="field font-mono text-[13.5px]"
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                value={turnUser}
-                onChange={(event) => setTurnUser(event.target.value)}
-                placeholder="Username"
-                aria-label="TURN username"
-                className="field text-[13.5px]"
-              />
-              <input
-                value={turnPass}
-                onChange={(event) => setTurnPass(event.target.value)}
-                placeholder="Credential"
-                type="password"
-                aria-label="TURN credential"
-                className="field text-[13.5px]"
-              />
-            </div>
-            <p className="text-[13px] text-hull-500 dark:text-hull-400">
-              Without TURN, a few restrictive networks cannot form a direct
-              link. Ferry falls back to the relay in that case, which is still
-              end-to-end encrypted but slower.
-            </p>
-          </div>
-        </details>
-
-        <div className="flex gap-2.5">
-          <Button variant="primary" onClick={save} block>
-            Save settings
-          </Button>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
+      <div className="flex gap-2.5">
+        <Button variant="primary" onClick={save} block>
+          Save settings
+        </Button>
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
       </div>
-    </Sheet>
+    </div>
   );
 }

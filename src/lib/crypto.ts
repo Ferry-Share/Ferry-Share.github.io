@@ -223,7 +223,8 @@ export async function seal(key: CryptoKey, plaintext: Uint8Array): Promise<Uint8
 }
 
 export async function open(key: CryptoKey, framed: Uint8Array): Promise<Uint8Array> {
-  if (framed.byteLength < 29) throw new Error("Frame is too short to be valid");
+  // 12-byte nonce plus a 16-byte tag is the shortest a valid frame can be.
+  if (framed.byteLength < 28) throw new Error("Frame is too short to be valid");
   const nonce = framed.subarray(0, 12);
   const body = framed.subarray(12);
   const plaintext = await crypto.subtle.decrypt(
@@ -249,8 +250,13 @@ export async function openJson<T>(key: CryptoKey, encoded: string): Promise<T> {
 /* ------------------------------------------------------------------ */
 
 /**
- * A 256-word list of short, phonetically distinct nouns. Four words carry
- * 32 bits, which is ample for catching an active man-in-the-middle.
+ * Exactly 256 short, phonetically distinct nouns. One byte selects one word,
+ * so the mapping is a bijection: every word is reachable and no word is more
+ * likely than another. Four words carry a full 32 bits, which is ample for
+ * catching an active man in the middle.
+ *
+ * The length is asserted below — a list of any other size would reintroduce
+ * modulo bias and silently weaken that check, so it must fail the build.
  */
 const WORDLIST = [
   "anchor","amber","apple","arbor","arrow","aspen","atlas","autumn","bacon","badge",
@@ -278,10 +284,19 @@ const WORDLIST = [
   "puffin","pumice","quarry","quartz","quiver","radish","rafter","rapids","raven","reef",
   "relay","rhubarb","ribbon","rigging","ripple","rivet","rocket","rosemary","rudder","runner",
   "saffron","sailor","salmon","sandbar","sapling","satchel","saucer","scallop","schooner","sequoia",
-  "shadow","shamrock","shelter","sherpa","shingle","sierra","signal","silo","silver","siphon",
-  "skiff","slate","sleigh","socket","sonnet","sorrel","spindle",
-];
+  "shadow","shamrock","shelter","sherpa","shingle","sierra"
+] as const;
+
+/** Fails `npm run typecheck` and the build if WORDLIST stops being 256 long. */
+const WORDLIST_IS_256: 256 = WORDLIST.length;
+void WORDLIST_IS_256;
 
 function wordsFromBits(bits: Uint8Array): string[] {
-  return Array.from(bits.subarray(0, 4), (byte) => WORDLIST[byte % WORDLIST.length]);
+  return Array.from(bits.subarray(0, 4), (byte) => WORDLIST[byte]);
 }
+
+/**
+ * Exposed so the test suite can assert the bijection above directly. Nothing
+ * in the app reads this.
+ */
+export const safetyWordsForTests = { wordlist: WORDLIST, wordsFromBits } as const;

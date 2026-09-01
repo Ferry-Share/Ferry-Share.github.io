@@ -1,9 +1,14 @@
 # Alternative relay host. `fly launch --no-deploy` then `fly deploy`.
+#
+# Built from the repository Dockerfile, which installs production dependencies
+# only — that is `ws` and nothing else. The previous heroku/builder setting
+# started the app with `npm start`, which on a buildpack image has no `./out`
+# to serve and exited immediately.
 app = "ferry-relay"
 primary_region = "sin"
 
 [build]
-  builder = "heroku/builder:22"
+  dockerfile = "Dockerfile"
 
 [env]
   PORT = "8081"

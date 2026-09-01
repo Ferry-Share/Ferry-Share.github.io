@@ -32,7 +32,12 @@ export function useSession() {
 export function useTicker(active: boolean, onTick?: () => void): number {
   const [now, setNow] = useState(() => Date.now());
   const callback = useRef(onTick);
-  callback.current = onTick;
+
+  // Kept in a ref so a fresh inline callback each render does not restart the
+  // interval, and written in an effect rather than during render.
+  useEffect(() => {
+    callback.current = onTick;
+  }, [onTick]);
 
   useEffect(() => {
     if (!active) return;

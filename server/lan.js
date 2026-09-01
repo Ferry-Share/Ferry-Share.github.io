@@ -22,7 +22,10 @@ const os = require("node:os");
 const { attachRelay, stats } = require("./relay");
 
 const PORT = Number(process.env.PORT || 8080);
-const ROOT = path.join(__dirname, "..", "out");
+const ROOT = path.resolve(__dirname, "..", "out");
+// Compared against with the separator attached: a bare prefix test would also
+// accept a sibling directory whose name merely starts with "out".
+const ROOT_PREFIX = ROOT + path.sep;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -44,10 +47,18 @@ if (!fs.existsSync(ROOT)) {
 }
 
 function resolve(urlPath) {
-  const clean = decodeURIComponent(urlPath.split("?")[0].split("#")[0]);
-  const target = path.normalize(path.join(ROOT, clean));
-  // Refuse anything that tries to climb out of the build directory.
-  if (!target.startsWith(ROOT)) return null;
+  let clean;
+  try {
+    clean = decodeURIComponent(urlPath.split("?")[0].split("#")[0]);
+  } catch {
+    // A malformed percent-escape is a bad request, not a reason to fall over.
+    return null;
+  }
+
+  const target = path.resolve(ROOT, "." + path.posix.resolve("/", clean));
+  // Refuse anything that tries to climb out of the build directory. ROOT
+  // itself is allowed; everything else must sit strictly beneath it.
+  if (target !== ROOT && !target.startsWith(ROOT_PREFIX)) return null;
 
   if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
     const index = path.join(target, "index.html");
@@ -91,6 +102,9 @@ const server = http.createServer((request, response) => {
 attachRelay(server);
 
 server.listen(PORT, "0.0.0.0", () => {
+  // Report the port actually bound, which differs from PORT whenever the
+  // caller asked for an ephemeral one.
+  const port = server.address().port;
   const addresses = [];
   for (const interfaces of Object.values(os.networkInterfaces())) {
     for (const details of interfaces || []) {
@@ -99,9 +113,9 @@ server.listen(PORT, "0.0.0.0", () => {
   }
 
   console.log("\n  Ferry is running on this network\n");
-  console.log(`    On this machine   http://localhost:${PORT}`);
+  console.log(`    On this machine   http://localhost:${port}`);
   for (const address of addresses) {
-    console.log(`    On other devices  http://${address}:${PORT}`);
+    console.log(`    On other devices  http://${address}:${port}`);
   }
   console.log("\n  Relay and front end are served together. Press Ctrl+C to stop.\n");
 });

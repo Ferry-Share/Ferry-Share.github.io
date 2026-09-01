@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, typecheck, test and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run typecheck
+
+      # The LAN host tests serve the real export, so build before testing.
+      - run: npm run build
+
+      - run: npm test
+
+  relay:
+    name: Relay installs and starts on its own
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Exactly what Render, Fly and the Dockerfile do. The relay must come up
+      # without a single front-end package present.
+      - run: npm ci --omit=dev
+
+      - name: Start the relay and check it answers
+        run: |
+          PORT=8081 node server/relay.js &
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8081/health; then
+              echo
+              echo "relay is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "relay never became healthy"
+          exit 1

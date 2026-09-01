@@ -83,9 +83,11 @@ somewhere else costs you nothing in privacy.
    candidates are encrypted before they reach the relay, so your local IP
    addresses are not exposed to it either.
 
-The relevant tests live in the repo history; the properties above were verified
-against the real WebCrypto implementation: keys agree, directions are
-independent, a wrong-PIN peer is rejected, and replays are rejected.
+Every property above is asserted in `test/`, against the real WebCrypto
+implementation rather than a stand-in: both sides agree on a key and on the
+same four words, the two directions use independent keys, a peer holding the
+wrong PIN derives a different key and is refused, a tampered frame fails its
+integrity check, and no nonce ever repeats. Run them with `npm test`.
 
 ### What Ferry deliberately does not protect against
 
@@ -108,8 +110,16 @@ npm run dev:relay    # relay at ws://localhost:8081/ws (second terminal)
 
 npm run build        # static export into ./out
 npm run lan          # build, then serve front end + relay together on your LAN
+npm start            # relay only — this is what a host platform runs
+
+npm run lint
 npm run typecheck
+npm test             # needs a build first: the LAN host tests serve ./out
 ```
+
+`npm test` covers the relay (pairing, forwarding, a refused third device), the
+crypto properties listed above, and the LAN host's refusal to serve anything
+outside `./out`.
 
 During `npm run dev` the app looks for a relay on its own origin. Point it at
 the dev relay once via **Settings → Relay address**: `ws://localhost:8081/ws`.
@@ -132,6 +142,10 @@ The workflow sets `NEXT_PUBLIC_BASE_PATH` for you: `/repo-name` for a project
 site, empty for a `username.github.io` site.
 
 ### Relay → anywhere that runs Node
+
+Only `ws` is a runtime dependency — Next, React and the rest are build-time
+only — so `npm ci --omit=dev` on any of these installs a single package rather
+than the whole front-end toolchain.
 
 **Render** — New → Blueprint → pick this repo. `render.yaml` does the rest.
 
@@ -182,6 +196,10 @@ src/
 server/
   relay.js             the rendezvous relay
   lan.js               static host + relay in one process
+test/
+  crypto.test.mjs      key agreement, directions, wrong PIN, tampering
+  relay.test.js        pairing, forwarding, room limits, bad frames
+  lan.test.js          the LAN host serves ./out and nothing else
 ```
 
 ## Behaviour worth knowing
