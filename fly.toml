@@ -1,0 +1,23 @@
+# Alternative relay host. `fly launch --no-deploy` then `fly deploy`.
+app = "ferry-relay"
+primary_region = "sin"
+
+[build]
+  builder = "heroku/builder:22"
+
+[env]
+  PORT = "8081"
+
+[http_service]
+  internal_port = 8081
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[http_service.checks]]
+  grace_period = "5s"
+  interval = "30s"
+  method = "GET"
+  path = "/health"
+  timeout = "5s"

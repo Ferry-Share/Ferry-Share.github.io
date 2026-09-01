@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --grid-line: rgba(30, 61, 69, 0.06);
+  }
+
+  .dark {
+    --grid-line: rgba(186, 207, 209, 0.06);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-fog-100 font-sans text-[15px] leading-relaxed text-hull-800 antialiased dark:bg-hull-950 dark:text-hull-100;
+    /* Faint chart grid: a nod to the nautical charts the safety words come from. */
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 44px 44px;
+    min-height: 100dvh;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-[-0.015em] text-hull-900 dark:text-fog-100;
+    text-wrap: balance;
+  }
+
+  ::selection {
+    @apply bg-sea-300/50;
+  }
+
+  :focus-visible {
+    @apply outline outline-2 outline-offset-2 outline-sea-500;
+  }
+}
+
+@layer components {
+  .plate {
+    @apply rounded-plate border border-hull-200/70 bg-white shadow-plate dark:border-hull-800 dark:bg-hull-900;
+  }
+
+  .panel {
+    @apply rounded-card border border-hull-200/70 bg-white dark:border-hull-800 dark:bg-hull-900;
+  }
+
+  .field {
+    @apply w-full rounded-xl border border-hull-200 bg-fog-50 px-3.5 py-2.5 text-[15px] text-hull-900 placeholder:text-hull-400
+      focus:border-sea-500 focus:outline-none focus:ring-2 focus:ring-sea-500/25
+      dark:border-hull-700 dark:bg-hull-950 dark:text-fog-100 dark:placeholder:text-hull-500;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-medium;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

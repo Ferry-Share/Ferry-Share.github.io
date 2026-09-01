@@ -1,0 +1,13 @@
+# One-click relay deploy on Render (free tier is enough).
+# In the Render dashboard: New → Blueprint → point it at this repo.
+services:
+  - type: web
+    name: ferry-relay
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: node server/relay.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

@@ -1,0 +1,324 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSession } from "@/hooks/useSession";
+import { normalizePin, PIN_LENGTH } from "@/lib/crypto";
+import {
+  defaultRelayUrl,
+  getRelayUrl,
+  getTurnConfig,
+  isValidRelayUrl,
+  setRelayUrl,
+  setTurnConfig,
+} from "@/lib/config";
+import { Button, Icon, Sheet, ToastHost, useToast } from "./ui";
+import { Pairing } from "./Pairing";
+import { Workspace } from "./Workspace";
+
+export default function Ferry() {
+  return (
+    <ToastHost>
+      <Shell />
+    </ToastHost>
+  );
+}
+
+function Shell() {
+  const { session, state } = useSession();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [autoPin, setAutoPin] = useState<string | null>(null);
+  const toast = useToast();
+
+  // A shared invite arrives as #p=CODE. Read it, then scrub it from the bar so
+  // the secret does not sit in the address field or in browser history.
+  useEffect(() => {
+    const match = /[#&]p=([^&]+)/.exec(window.location.hash);
+    if (!match) return;
+    const pin = normalizePin(decodeURIComponent(match[1]));
+    if (pin.length === PIN_LENGTH) setAutoPin(pin);
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, []);
+
+  useEffect(() => {
+    if (state.error && state.phase !== "error") toast.push(state.error, "bad");
+  }, [state.error, state.phase, toast]);
+
+  const connected = state.phase === "ready";
+
+  return (
+    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-12 sm:px-6">
+      <Header onOpenSettings={() => setSettingsOpen(true)} />
+
+      <main className="flex-1">
+        {connected ? (
+          <Workspace session={session} state={state} />
+        ) : (
+          <>
+            {state.phase === "idle" || state.phase === "ended" ? <Hero /> : null}
+            <Pairing session={session} state={state} autoPin={autoPin} />
+            {state.phase === "idle" || state.phase === "ended" ? <HowItWorks /> : null}
+          </>
+        )}
+      </main>
+
+      <Footer onOpenSettings={() => setSettingsOpen(true)} />
+      <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Chrome                                                              */
+/* ------------------------------------------------------------------ */
+
+function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("ferry.theme", next ? "dark" : "light");
+  };
+
+  return (
+    <header className="flex items-center justify-between gap-4 py-5 sm:py-7">
+      <a href="#main" className="flex items-center gap-2.5">
+        <Wordmark />
+        <span className="font-display text-[19px] font-bold tracking-tight text-hull-900 dark:text-fog-100">
+          Ferry
+        </span>
+      </a>
+
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="sm" onClick={toggle} aria-label="Switch theme">
+          {dark ? <SunGlyph /> : <MoonGlyph />}
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onOpenSettings}>
+          <Icon name="settings" className="h-4 w-4" />
+          <span className="hidden sm:inline">Settings</span>
+        </Button>
+      </div>
+    </header>
+  );
+}
+
+function Wordmark() {
+  return (
+    <svg viewBox="0 0 28 28" className="h-7 w-7" aria-hidden="true">
+      <rect width="28" height="28" rx="8" className="fill-hull-900 dark:fill-fog-100" />
+      <path
+        d="M7 17.5h14M8.5 17.5l1.6-4.8h7.8l1.6 4.8M11.5 12.7V8.6h5v4.1"
+        fill="none"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="stroke-signal-400"
+      />
+    </svg>
+  );
+}
+
+function SunGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <circle cx="10" cy="10" r="3.4" />
+      <path d="M10 2.4v1.8M10 15.8v1.8M17.6 10h-1.8M4.2 10H2.4M15.4 4.6l-1.3 1.3M5.9 14.1l-1.3 1.3M15.4 15.4l-1.3-1.3M5.9 5.9L4.6 4.6" />
+    </svg>
+  );
+}
+
+function MoonGlyph() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+      <path d="M16.2 12.3A6.8 6.8 0 0 1 7.7 3.8a6.8 6.8 0 1 0 8.5 8.5z" />
+    </svg>
+  );
+}
+
+function Hero() {
+  return (
+    <section id="main" className="pb-8 pt-2 sm:pb-10">
+      <h1 className="max-w-[19ch] text-[38px] font-bold leading-[1.05] sm:text-[54px]">
+        Hand it to your other device.
+      </h1>
+      <p className="mt-4 max-w-prose text-[17px] text-hull-600 dark:text-hull-300">
+        A password, a paragraph, a file. Ferry moves it across in a couple of
+        seconds, encrypted the whole way, and keeps nothing once you close the
+        tab.
+      </p>
+    </section>
+  );
+}
+
+function HowItWorks() {
+  const steps = [
+    {
+      title: "One device opens a crossing",
+      body: "It mints a ten character code and shows it as a QR. The code is the only secret, and it never reaches a server — the relay only ever sees a hash of it.",
+    },
+    {
+      title: "The other device reads the code",
+      body: "Both browsers generate a throwaway key pair and agree on a shared key. Because the agreement is salted with the code, a relay that tried to insert itself would end up with a different key and be caught immediately.",
+    },
+    {
+      title: "Both screens show four words",
+      body: "Those words come from the agreed key. Matching words on both devices mean nobody is in the middle.",
+    },
+    {
+      title: "The data goes straight across",
+      body: "On the same network the bytes travel device to device and never touch the relay at all. When a network blocks that, the same encrypted frames are forwarded instead — the relay still cannot read them.",
+    },
+  ];
+
+  return (
+    <section className="mt-14">
+      <h2 className="text-2xl font-semibold">How a crossing works</h2>
+      <ol className="mt-6 grid gap-x-8 gap-y-7 sm:grid-cols-2">
+        {steps.map((step, index) => (
+          <li key={step.title} className="flex gap-4">
+            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-hull-900 font-mono text-[13px] font-bold text-signal-400 dark:bg-hull-800">
+              {index + 1}
+            </span>
+            <div>
+              <h3 className="text-[15px] font-semibold">{step.title}</h3>
+              <p className="mt-1 text-[14.5px] text-hull-600 dark:text-hull-300">
+                {step.body}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function Footer({ onOpenSettings }: { onOpenSettings: () => void }) {
+  return (
+    <footer className="mt-14 flex flex-col gap-3 border-t border-hull-200/70 pt-6 text-[13.5px] text-hull-500 sm:flex-row sm:items-center sm:justify-between dark:border-hull-800 dark:text-hull-400">
+      <p>
+        Ferry keeps no accounts, no logs and no copies. Close the tab and the
+        session is gone.
+      </p>
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="self-start font-medium text-sea-600 hover:underline dark:text-sea-400"
+      >
+        Relay and network settings
+      </button>
+    </footer>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings                                                            */
+/* ------------------------------------------------------------------ */
+
+function Settings({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [relay, setRelay] = useState("");
+  const [turnUrls, setTurnUrls] = useState("");
+  const [turnUser, setTurnUser] = useState("");
+  const [turnPass, setTurnPass] = useState("");
+  const toast = useToast();
+
+  useEffect(() => {
+    if (!open) return;
+    setRelay(getRelayUrl());
+    const turn = getTurnConfig();
+    setTurnUrls(turn?.urls ?? "");
+    setTurnUser(turn?.username ?? "");
+    setTurnPass(turn?.credential ?? "");
+  }, [open]);
+
+  const save = () => {
+    if (relay && !isValidRelayUrl(relay)) {
+      toast.push("A relay address must start with ws:// or wss://", "bad");
+      return;
+    }
+    setRelayUrl(relay);
+    setTurnConfig(
+      turnUrls
+        ? { urls: turnUrls.trim(), username: turnUser.trim(), credential: turnPass.trim() }
+        : null,
+    );
+    toast.push("Settings saved. They apply to your next session.", "good");
+    onClose();
+  };
+
+  return (
+    <Sheet open={open} title="Relay and network" onClose={onClose}>
+      <div className="space-y-5">
+        <div>
+          <label htmlFor="relay-url" className="mb-1.5 block text-sm font-medium">
+            Relay address
+          </label>
+          <input
+            id="relay-url"
+            value={relay}
+            onChange={(event) => setRelay(event.target.value)}
+            placeholder={defaultRelayUrl() || "wss://your-relay.example.com/ws"}
+            spellCheck={false}
+            className="field font-mono text-[13.5px]"
+          />
+          <p className="mt-1.5 text-[13px] text-hull-500 dark:text-hull-400">
+            The relay introduces the two devices. It never sees your code or
+            your data. Point this at your own if you would rather not use the
+            default.
+          </p>
+        </div>
+
+        <details className="rounded-xl bg-fog-100 p-4 dark:bg-hull-950">
+          <summary className="cursor-pointer text-sm font-medium">
+            TURN server (only for stubborn networks)
+          </summary>
+          <div className="mt-4 space-y-3">
+            <input
+              value={turnUrls}
+              onChange={(event) => setTurnUrls(event.target.value)}
+              placeholder="turn:turn.example.com:3478"
+              spellCheck={false}
+              aria-label="TURN server address"
+              className="field font-mono text-[13.5px]"
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input
+                value={turnUser}
+                onChange={(event) => setTurnUser(event.target.value)}
+                placeholder="Username"
+                aria-label="TURN username"
+                className="field text-[13.5px]"
+              />
+              <input
+                value={turnPass}
+                onChange={(event) => setTurnPass(event.target.value)}
+                placeholder="Credential"
+                type="password"
+                aria-label="TURN credential"
+                className="field text-[13.5px]"
+              />
+            </div>
+            <p className="text-[13px] text-hull-500 dark:text-hull-400">
+              Without TURN, a few restrictive networks cannot form a direct
+              link. Ferry falls back to the relay in that case, which is still
+              end-to-end encrypted but slower.
+            </p>
+          </div>
+        </details>
+
+        <div className="flex gap-2.5">
+          <Button variant="primary" onClick={save} block>
+            Save settings
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}

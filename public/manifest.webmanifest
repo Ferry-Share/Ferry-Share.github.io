@@ -1,0 +1,12 @@
+{
+  "name": "Ferry — hand things between your devices",
+  "short_name": "Ferry",
+  "description": "Move a password, text or file between two devices. End-to-end encrypted, nothing stored.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F1F5F4",
+  "theme_color": "#0C1D23",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
