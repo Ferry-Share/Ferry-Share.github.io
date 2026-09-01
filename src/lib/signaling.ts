@@ -48,12 +48,31 @@ export class SignalingClient {
     this.openSocket();
   }
 
+  /**
+   * The room id also rides in the query string. A relay that has to pick a
+   * backend before the first message can be read — a Cloudflare Worker
+   * choosing a Durable Object, say — needs it during the upgrade. The Node
+   * relay ignores the parameter and reads the `join` message as before.
+   *
+   * This tells the relay nothing it was not about to learn: the room id is a
+   * truncated SHA-256 of the PIN and cannot be inverted to recover it.
+   */
+  private endpoint(): string {
+    try {
+      const url = new URL(this.url);
+      url.searchParams.set("room", this.roomId);
+      return url.toString();
+    } catch {
+      return this.url;
+    }
+  }
+
   private openSocket(): void {
     this.handlers.onStatus(this.attempts === 0 ? "connecting" : "reconnecting");
 
     let socket: WebSocket;
     try {
-      socket = new WebSocket(this.url);
+      socket = new WebSocket(this.endpoint());
     } catch {
       this.scheduleReconnect("That relay address could not be opened");
       return;

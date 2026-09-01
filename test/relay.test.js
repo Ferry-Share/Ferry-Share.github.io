@@ -172,6 +172,29 @@ test("malformed control frames are rejected without dropping the connection", as
   a.close();
 });
 
+test("the room query parameter the Worker needs is harmless here", async (t) => {
+  const { server, port } = await listen();
+  t.after(() => server.close());
+
+  // The front end appends ?room=<id> so a Cloudflare Worker can pick a Durable
+  // Object during the upgrade. This relay reads the join message instead, and
+  // must keep accepting the connection regardless.
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/ws?room=${ROOM}`);
+  socket.binaryType = "arraybuffer";
+  const first = new Promise((resolve, reject) => {
+    socket.on("message", (data) => resolve(JSON.parse(data.toString())));
+    socket.on("error", reject);
+  });
+  await new Promise((resolve, reject) => {
+    socket.on("open", resolve);
+    socket.on("error", reject);
+  });
+  socket.send(JSON.stringify({ t: "join", room: ROOM }));
+
+  assert.deepEqual(await first, { t: "joined", role: "initiator", occupants: 1 });
+  socket.close();
+});
+
 test("a device cannot occupy two rooms on one connection", async (t) => {
   const { server, port } = await listen();
   t.after(() => server.close());

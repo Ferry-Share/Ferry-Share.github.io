@@ -13,6 +13,12 @@ const config = [
     languageOptions: { sourceType: "commonjs" },
     rules: { "@typescript-eslint/no-require-imports": "off" },
   },
+  {
+    // The Worker relay is an ES module running on Cloudflare's runtime, not in
+    // Node and not in the browser.
+    files: ["worker/**/*.js"],
+    languageOptions: { sourceType: "module" },
+  },
 ];
 
 export default config;

@@ -12,7 +12,7 @@
     "relay": "node server/relay.js",
     "start": "node server/relay.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test test/crypto.test.mjs test/lan.test.js test/relay.test.js",
+    "test": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test test/crypto.test.mjs test/lan.test.js test/relay.test.js test/worker.test.mjs",
     "lint": "eslint ."
   },
   "dependencies": {

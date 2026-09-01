@@ -1,0 +1,28 @@
+# Ferry relay on Cloudflare Workers.
+#
+#   npx wrangler login
+#   npx wrangler deploy
+#
+# Prints a URL like https://ferry-relay.<your-subdomain>.workers.dev — the
+# relay address for Ferry is that host with a wss:// scheme and /ws on the end.
+#
+# wrangler is deliberately not a dependency of this repo: the front end and the
+# Node relay do not need it, and `npx` fetches it only when you deploy.
+name = "ferry-relay"
+main = "worker/index.js"
+compatibility_date = "2026-01-01"
+
+# One Durable Object per room id, so the two devices meet at the same instance.
+[[durable_objects.bindings]]
+name = "FERRY_ROOM"
+class_name = "Room"
+
+# SQLite-backed Durable Objects are the ones available on the Workers free
+# plan. The relay stores nothing across connections, but the class still has
+# to be declared this way to run without a paid plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[observability]
+enabled = true
