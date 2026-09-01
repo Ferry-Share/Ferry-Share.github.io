@@ -102,6 +102,9 @@ integrity check, and no nonce ever repeats. Run them with `npm test`.
 
 ## Running it
 
+Node 22 or newer. The test suite imports the TypeScript sources directly,
+which relies on the type stripping Node enables by default from 22.18.
+
 ```bash
 npm install
 
