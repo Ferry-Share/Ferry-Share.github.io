@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/hooks/useSession";
 import { normalizePin, PIN_LENGTH } from "@/lib/crypto";
@@ -133,7 +134,14 @@ function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
 
 function AppLogo() {
   return (
-    <img src={LOGO_URL} alt="Ferry logo" className="h-8 w-8 rounded-lg object-cover" />
+    <Image
+      src={LOGO_URL}
+      alt="Ferry logo"
+      width={32}
+      height={32}
+      className="rounded-lg object-cover"
+      priority
+    />
   );
 }
 
