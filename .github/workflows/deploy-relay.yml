@@ -38,7 +38,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check the API token is present
+      # wrangler's own failure for a bad credential is "Invalid format for
+      # Authorization header [code: 6111]", which does not say what to fix.
+      # These checks name the actual problem. None of them ever print the
+      # token: only its length and shape.
+      - name: Check the API token
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
@@ -46,6 +50,43 @@ jobs:
             echo "::error::CLOUDFLARE_API_TOKEN is not set. Create a token from Cloudflare's 'Edit Cloudflare Workers' template and add it under Settings -> Secrets and variables -> Actions -> Secrets."
             exit 1
           fi
+
+          case "$CLOUDFLARE_API_TOKEN" in
+            Bearer*)
+              echo "::error::CLOUDFLARE_API_TOKEN begins with 'Bearer'. Store the token on its own; wrangler adds the scheme."
+              exit 1
+              ;;
+          esac
+
+          raw=${#CLOUDFLARE_API_TOKEN}
+          stripped=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]')
+          if [ "$raw" -ne "${#stripped}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN contains whitespace ($raw characters, ${#stripped} without it). A stray newline or space cannot go in an Authorization header, which is exactly what error 6111 reports. Re-add the secret with nothing before or after the token."
+            exit 1
+          fi
+
+          if printf '%s' "$CLOUDFLARE_API_TOKEN" | grep -qE '^[0-9a-f]{37}$'; then
+            echo "::error::That is a Global API Key (37 hex characters), not an API Token. They are different credentials and wrangler wants the second. Create one from Cloudflare's 'Edit Cloudflare Workers' template and replace the secret."
+            exit 1
+          fi
+
+          # Ask Cloudflare directly, so a bad token fails here with a readable
+          # reason rather than midway through a deploy. The token goes in a
+          # config file rather than the command line, to keep it out of argv.
+          printf 'header = "Authorization: Bearer %s"\n' "$CLOUDFLARE_API_TOKEN" > .curlrc
+          status=$(curl -sS --config .curlrc -o verify.json -w '%{http_code}' \
+            https://api.cloudflare.com/client/v4/user/tokens/verify || echo 000)
+          rm -f .curlrc
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Cloudflare rejected the token (HTTP $status). Its reply:"
+            cat verify.json || true
+            echo
+            echo "::error::Create a fresh API Token from the 'Edit Cloudflare Workers' template and update the CLOUDFLARE_API_TOKEN secret. Note this is an API *Token*, not the Global API Key, and not the account id."
+            exit 1
+          fi
+
+          echo "Token accepted by Cloudflare."
 
       # The Worker has no dependencies of its own, so this is wrangler alone.
       # Pinned to a major version: an unpinned tool that deploys to production
