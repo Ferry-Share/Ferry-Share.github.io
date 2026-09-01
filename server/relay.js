@@ -187,9 +187,24 @@ function attachRelay(server, options = {}) {
     }
   }, 60_000);
 
-  wss.on("close", () => {
+  // Background housekeeping should not by itself keep Node alive: without
+  // this, closing the http server leaves the process running on these two
+  // timers alone.
+  heartbeat.unref?.();
+  reaper.unref?.();
+
+  const stop = () => {
     clearInterval(heartbeat);
     clearInterval(reaper);
+  };
+
+  wss.on("close", stop);
+  // A WebSocketServer bound to an existing server is not closed when that
+  // server is, so shut it down alongside its host.
+  server.on("close", () => {
+    stop();
+    for (const socket of wss.clients) socket.terminate();
+    wss.close();
   });
 
   return wss;

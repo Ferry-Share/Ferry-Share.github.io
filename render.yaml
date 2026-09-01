@@ -1,5 +1,8 @@
 # One-click relay deploy on Render (free tier is enough).
 # In the Render dashboard: New → Blueprint → point it at this repo.
+#
+# `--omit=dev` installs `ws` alone: the front end is a static export served
+# from GitHub Pages, so none of the build toolchain is needed here.
 services:
   - type: web
     name: ferry-relay
@@ -10,4 +13,4 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: "20"
+        value: "22"

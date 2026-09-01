@@ -12,6 +12,7 @@ import {
   generateEphemeralKeyPair,
   generatePin,
   normalizePin,
+  PIN_LENGTH,
   openJson,
   roomIdFromPin,
   type Role,
@@ -126,6 +127,7 @@ export class Session {
   private keys: SessionKeys | null = null;
   private keySent = false;
   private helloSent = false;
+  private transportReady = false;
   private assemblies = new Map<string, Assembly>();
   private sendChain: Promise<void> = Promise.resolve();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
@@ -159,8 +161,11 @@ export class Session {
   /** Walk up to a session someone else opened. */
   async join(rawPin: string): Promise<void> {
     const pin = normalizePin(rawPin);
-    if (pin.length !== 10) {
-      this.patch({ phase: "error", error: "That code is not ten characters long." });
+    if (pin.length !== PIN_LENGTH) {
+      this.patch({
+        phase: "error",
+        error: `That code is not ${PIN_LENGTH} characters long.`,
+      });
       return;
     }
     await this.begin(pin);
@@ -237,6 +242,7 @@ export class Session {
         this.patch({ peerPresent: true, phase: "connecting" });
         await this.offerKey();
       } else {
+        this.stopHeartbeat();
         this.patch({
           peerPresent: false,
           error: "The other device left.",
@@ -299,11 +305,15 @@ export class Session {
       onMode: (transportMode) => this.patch({ transportMode }),
       onFrame: (frame) => this.handleFrame(frame),
       onReady: () => {
+        this.transportReady = true;
         void this.sendHello();
         this.startHeartbeat();
         if (this.state.verified) this.patch({ phase: "ready" });
       },
-      onClosed: (reason) => this.patch({ phase: "error", error: reason }),
+      onClosed: (reason) => {
+        this.stopHeartbeat();
+        this.patch({ phase: "error", error: reason });
+      },
     });
 
     await this.transport.start();
@@ -312,7 +322,10 @@ export class Session {
   /** The user confirmed the safety words match on both screens. */
   confirmSafetyWords(): void {
     this.patch({ verified: true });
-    if (this.transport?.currentMode !== "connecting") this.patch({ phase: "ready" });
+    // Only a transport that has actually come up can carry an item. Without
+    // this the session could reach "ready" with nothing to send on, and every
+    // send would be dropped in silence.
+    if (this.transportReady) this.patch({ phase: "ready" });
   }
 
   private async sendHello(): Promise<void> {
@@ -323,6 +336,11 @@ export class Session {
       version: PROTOCOL_VERSION,
     };
     await this.transport?.send(encodeJsonFrame(FRAME.HELLO, payload));
+  }
+
+  private stopHeartbeat(): void {
+    if (this.pingTimer) clearInterval(this.pingTimer);
+    this.pingTimer = null;
   }
 
   private startHeartbeat(): void {
@@ -628,8 +646,7 @@ export class Session {
   }
 
   private teardown(): void {
-    if (this.pingTimer) clearInterval(this.pingTimer);
-    this.pingTimer = null;
+    this.stopHeartbeat();
     this.transport?.close();
     this.transport = null;
     this.signaling?.close();
@@ -638,6 +655,7 @@ export class Session {
     this.keys = null;
     this.keySent = false;
     this.helloSent = false;
+    this.transportReady = false;
     this.openIncoming = null;
     this.assemblies.clear();
     this.sendChain = Promise.resolve();

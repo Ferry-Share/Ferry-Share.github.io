@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatPin, isCompletePin, normalizePin, PIN_LENGTH } from "@/lib/crypto";
 import type { Session, SessionState } from "@/lib/session";
 import { copyToClipboard } from "@/lib/utils";
@@ -19,26 +19,42 @@ export function Pairing({
   autoPin: string | null;
 }) {
   const [mode, setMode] = useState<Mode>("choose");
+  const autoPinUsed = useRef(false);
   const toast = useToast();
 
-  // A shared link lands here with the code already in the fragment.
+  // A shared link lands here with the code already in the fragment. It is
+  // followed exactly once: after a reset the person is back in charge, and
+  // silently re-dialling the same code behind them would be surprising.
   useEffect(() => {
-    if (!autoPin || state.phase !== "idle") return;
+    if (!autoPin || autoPinUsed.current || state.phase !== "idle") return;
+    autoPinUsed.current = true;
     setMode("join");
     void session.join(autoPin);
   }, [autoPin, session, state.phase]);
 
-  useEffect(() => {
+  // Adjusted during render rather than in an effect: React re-runs this
+  // component with the new mode before painting, instead of showing a frame of
+  // the stale one and then correcting it.
+  const [seenPhase, setSeenPhase] = useState(state.phase);
+  if (seenPhase !== state.phase) {
+    setSeenPhase(state.phase);
     if (state.phase === "ended") setMode("choose");
-  }, [state.phase]);
+  }
 
   const startHosting = useCallback(() => {
     setMode("host");
     void session.host();
   }, [session]);
 
+  // Tearing the session down has to put the chooser back on screen too.
+  // Resetting only the session left the host plate up with no code in it.
+  const abort = useCallback(() => {
+    session.reset();
+    setMode("choose");
+  }, [session]);
+
   if (state.phase === "verifying") {
-    return <Verify session={session} state={state} />;
+    return <Verify session={session} state={state} onAbort={abort} />;
   }
 
   if (mode === "host") {
@@ -49,10 +65,7 @@ export function Pairing({
           session.reset();
           startHosting();
         }}
-        onCancel={() => {
-          session.reset();
-          setMode("choose");
-        }}
+        onCancel={abort}
         toast={toast}
       />
     );
@@ -64,10 +77,7 @@ export function Pairing({
         session={session}
         state={state}
         initialPin={autoPin ?? ""}
-        onBack={() => {
-          session.reset();
-          setMode("choose");
-        }}
+        onBack={abort}
       />
     );
   }
@@ -391,7 +401,15 @@ function JoinPlate({
 /* Step 3 — safety words                                               */
 /* ------------------------------------------------------------------ */
 
-function Verify({ session, state }: { session: Session; state: SessionState }) {
+function Verify({
+  session,
+  state,
+  onAbort,
+}: {
+  session: Session;
+  state: SessionState;
+  onAbort: () => void;
+}) {
   return (
     <div className="plate p-6 sm:p-8">
       <div className="flex items-start gap-3">
@@ -423,7 +441,7 @@ function Verify({ session, state }: { session: Session; state: SessionState }) {
           <Icon name="check" className="h-5 w-5" />
           They match — continue
         </Button>
-        <Button variant="ghost" size="lg" onClick={() => session.reset()}>
+        <Button variant="ghost" size="lg" onClick={onAbort}>
           They differ, stop
         </Button>
       </div>

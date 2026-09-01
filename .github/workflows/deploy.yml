@@ -22,14 +22,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Work out the base path
         id: base
         run: |
-          # A project site lives at /<repo>. A user or org site lives at the root.
-          if [[ "${{ github.event.repository.name }}" == "${{ github.repository_owner }}.github.io" ]]; then
+          # A project site lives at /<repo>. A user or org site lives at the
+          # root. GitHub does not promise the casing of either name, and
+          # getting this wrong sends every asset URL to a 404, so compare the
+          # two case-insensitively.
+          repo=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          if [[ "$repo" == "$owner.github.io" ]]; then
             echo "path=" >> "$GITHUB_OUTPUT"
           else
             echo "path=/${{ github.event.repository.name }}" >> "$GITHUB_OUTPUT"
@@ -37,12 +42,19 @@ jobs:
 
       - run: npm ci
 
+      # Publishing a broken bundle to Pages is visible to everyone
+      # immediately, so it has to pass the same gate as a pull request.
+      - run: npm run lint
+      - run: npm run typecheck
+
       - run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: ${{ steps.base.outputs.path }}
           # Set this under Settings → Secrets and variables → Actions → Variables.
           # Example: wss://ferry-relay.onrender.com/ws
           NEXT_PUBLIC_RELAY_URL: ${{ vars.NEXT_PUBLIC_RELAY_URL }}
+
+      - run: npm test
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

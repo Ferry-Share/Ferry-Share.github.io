@@ -1,6 +1,6 @@
 # Relay-only image. The front end is a static export; serve it from Pages,
 # any CDN, or `npm run lan`.
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
