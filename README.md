@@ -33,7 +33,7 @@ address; open it on both devices and you are done. Nothing leaves your network.
 | Piece | Where it runs | What it costs |
 | --- | --- | --- |
 | Front end (`src/`) | GitHub Pages, via the included workflow | Free |
-| Relay (`server/relay.js`) | Render, Fly.io, Railway, or your own box | Free tier is plenty |
+| Relay | Cloudflare Workers, or Render/Fly/your own box | Free tier is plenty |
 
 The relay is about 200 lines. It matches two sockets on a room id and forwards
 bytes. It never sees your pairing code, your keys or your data, so hosting it
@@ -144,6 +144,46 @@ the dev relay once via **Settings → Relay address**: `ws://localhost:8081/ws`.
 The workflow sets `NEXT_PUBLIC_BASE_PATH` for you: `/repo-name` for a project
 site, empty for a `username.github.io` site.
 
+### Relay → Cloudflare Workers (recommended)
+
+Two ways, both free. Either produces the same Worker.
+
+**From GitHub Actions — nothing to install**
+
+1. In Cloudflare, create an API token from the **Edit Cloudflare Workers**
+   template. It already carries the Workers Scripts and Durable Objects
+   permissions this needs.
+2. Add it to this repository as a secret named `CLOUDFLARE_API_TOKEN`
+   (Settings → Secrets and variables → Actions → **Secrets**). A secret is
+   write-only: it never appears in a log and cannot be read back out.
+3. Run the **Deploy the relay to Cloudflare** workflow.
+
+The run summary prints the relay address, ready to paste.
+
+**From your own machine**
+
+```bash
+npx wrangler login
+npx wrangler deploy
+```
+
+Either way you end up with a URL like
+`https://ferry-relay.<your-subdomain>.workers.dev`. The relay address to give
+Ferry is that host as a WebSocket, with `/ws` on the end:
+
+```
+wss://ferry-relay.<your-subdomain>.workers.dev/ws
+```
+
+Free, and unlike the options below it does not sleep — there is no half-minute
+wait on the first pairing of the day. `wrangler.toml` and `worker/index.js`
+are all it needs; wrangler itself is not a dependency of this repo, so `npx`
+fetches it only when you deploy.
+
+The Worker speaks exactly the protocol in `server/relay.js`. It keeps one
+Durable Object per room id, which is how two browsers anywhere in the world
+land on the same instance and meet.
+
 ### Relay → anywhere that runs Node
 
 Only `ws` is a runtime dependency — Next, React and the rest are build-time
@@ -160,13 +200,20 @@ than the whole front-end toolchain.
 **Your own server** — `PORT=8081 node server/relay.js` behind nginx or Caddy
 with a WebSocket upgrade on `/ws`.
 
-Then tell the front end where it is. Either set a repository variable named
-`NEXT_PUBLIC_RELAY_URL` (Settings → Secrets and variables → Actions →
-Variables) to something like `wss://ferry-relay.onrender.com/ws`, or let each
-person enter it once under Settings — it is remembered in their browser.
+Then tell the front end where it is, or nobody will be able to pair: with no
+relay configured, Settings shows an empty **Relay address** field and starting
+a crossing fails. Two ways to fill it:
 
-> Free Render and Fly instances sleep when idle. The first pairing of the day
-> may take a few seconds to wake the relay.
+- **For everyone** — set a repository variable named `NEXT_PUBLIC_RELAY_URL`
+  (Settings → Secrets and variables → Actions → **Variables**, not Secrets) to
+  your `wss://…/ws` address, then re-run the Pages workflow. The address is
+  baked into the build, so every visitor gets it.
+- **Just for you** — paste it into **Settings → Relay address** in the app. It
+  is remembered in that browser only.
+
+> Free Render and Fly instances sleep when idle, so the first pairing after a
+> quiet spell waits for the relay to wake — commonly half a minute on Render.
+> The Cloudflare Worker above does not have this problem.
 
 ### Optional: TURN
 
@@ -197,12 +244,15 @@ src/
     session.ts         state machine, send queue, receive assembly, expiry
     config.ts          relay resolution, ICE servers, device labels
 server/
-  relay.js             the rendezvous relay
+  relay.js             the rendezvous relay, for any Node host
   lan.js               static host + relay in one process
+worker/
+  index.js             the same relay for Cloudflare Workers
 test/
   crypto.test.mjs      key agreement, directions, wrong PIN, tampering
   relay.test.js        pairing, forwarding, room limits, bad frames
   lan.test.js          the LAN host serves ./out and nothing else
+  worker.test.mjs      the Worker relay matches the Node one, and routing
 ```
 
 ## Behaviour worth knowing
