@@ -146,13 +146,30 @@ site, empty for a `username.github.io` site.
 
 ### Relay → Cloudflare Workers (recommended)
 
+Two ways, both free. Either produces the same Worker.
+
+**From GitHub Actions — nothing to install**
+
+1. In Cloudflare, create an API token from the **Edit Cloudflare Workers**
+   template. It already carries the Workers Scripts and Durable Objects
+   permissions this needs.
+2. Add it to this repository as a secret named `CLOUDFLARE_API_TOKEN`
+   (Settings → Secrets and variables → Actions → **Secrets**). A secret is
+   write-only: it never appears in a log and cannot be read back out.
+3. Run the **Deploy the relay to Cloudflare** workflow.
+
+The run summary prints the relay address, ready to paste.
+
+**From your own machine**
+
 ```bash
 npx wrangler login
 npx wrangler deploy
 ```
 
-That prints a URL like `https://ferry-relay.<your-subdomain>.workers.dev`. The
-relay address to give Ferry is that host as a WebSocket, with `/ws` on the end:
+Either way you end up with a URL like
+`https://ferry-relay.<your-subdomain>.workers.dev`. The relay address to give
+Ferry is that host as a WebSocket, with `/ws` on the end:
 
 ```
 wss://ferry-relay.<your-subdomain>.workers.dev/ws

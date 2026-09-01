@@ -1,0 +1,82 @@
+name: Deploy the relay to Cloudflare
+
+# The relay is the one always-on piece Ferry needs, and GitHub Pages cannot be
+# it. This deploys the Worker in `worker/` from a runner, so nobody has to
+# install wrangler or hold Cloudflare credentials on their own machine.
+#
+# One-time setup: add a repository secret named CLOUDFLARE_API_TOKEN
+# (Settings → Secrets and variables → Actions → Secrets), created from
+# Cloudflare's "Edit Cloudflare Workers" template. That template already
+# carries the Workers Scripts and Durable Objects permissions this needs.
+# A secret is write-only — it is never printed in a log and cannot be read
+# back out, which is why it belongs here rather than pasted into a chat.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "worker/**"
+      - "wrangler.toml"
+      - ".github/workflows/deploy-relay.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-relay
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: wrangler deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the API token is present
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not set. Create a token from Cloudflare's 'Edit Cloudflare Workers' template and add it under Settings -> Secrets and variables -> Actions -> Secrets."
+            exit 1
+          fi
+
+      # The Worker has no dependencies of its own, so this is wrangler alone.
+      # Pinned to a major version: an unpinned tool that deploys to production
+      # can change under you between one run and the next.
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -o pipefail
+          npx --yes wrangler@4 deploy 2>&1 | tee deploy.log
+
+      - name: Report the relay address
+        run: |
+          url=$(grep -oE 'https://[a-z0-9._-]+\.workers\.dev' deploy.log | head -1)
+          {
+            echo "## Relay deployed"
+            echo
+            if [ -n "$url" ]; then
+              echo "Relay address to give Ferry:"
+              echo
+              echo '```'
+              echo "wss://${url#https://}/ws"
+              echo '```'
+              echo
+              echo "To hand it to every visitor rather than configuring each browser:"
+              echo "set \`NEXT_PUBLIC_RELAY_URL\` to that address under"
+              echo "**Settings → Secrets and variables → Actions → Variables**,"
+              echo "then re-run **Deploy to GitHub Pages**."
+            else
+              echo "Deployed, but wrangler's output carried no workers.dev URL to report."
+              echo "Check the deploy step's log, or the Workers dashboard, for the address."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
