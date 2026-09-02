@@ -142,3 +142,48 @@ test("safety words come from a 256-word list with no modulo bias", () => {
   }
   assert.equal(reached.size, 256, "every word must be reachable");
 });
+
+/* ---------------------------------------------------------------- */
+/* Reconnecting without the original code                            */
+/* ---------------------------------------------------------------- */
+
+test("both devices derive the same reunion code without exchanging it", async () => {
+  const { a, b } = await handshake(generatePin());
+  assert.equal(a.reunionPin, b.reunionPin);
+  assert.equal(a.reunionPin.length, PIN_LENGTH);
+  // It has to survive a round trip through the same normaliser a typed code
+  // does, or reconnecting would land in a different room than it stored.
+  assert.equal(normalizePin(a.reunionPin), a.reunionPin);
+  assert.ok(isCompletePin(a.reunionPin));
+});
+
+test("the reunion code is not the code the user saw", async () => {
+  const pin = generatePin();
+  const { a } = await handshake(pin);
+  // This is the whole point of storing it instead: a code that was read
+  // aloud, photographed off a screen or left in a QR grants nothing later.
+  assert.notEqual(a.reunionPin, pin);
+});
+
+test("the reunion code rotates every time the same code is used", async () => {
+  const pin = generatePin();
+  // Same PIN, fresh ephemeral keys — which is exactly what a second pairing
+  // is. A value copied off disk must not keep working.
+  const first = await handshake(pin);
+  const second = await handshake(pin);
+  assert.notEqual(first.a.reunionPin, second.a.reunionPin);
+});
+
+test("a reunion code leads to its own room, not the original one", async () => {
+  const pin = generatePin();
+  const { a } = await handshake(pin);
+  assert.notEqual(await roomIdFromPin(a.reunionPin), await roomIdFromPin(pin));
+});
+
+test("the reunion code is independent of the session keys", async () => {
+  const { a } = await handshake(generatePin());
+  // Derived from the same material under a different info string, so knowing
+  // one must not hand over the other.
+  const sealed = await seal(a.outbound, new TextEncoder().encode("secret"));
+  assert.ok(!Buffer.from(sealed).includes(Buffer.from(a.reunionPin)));
+});

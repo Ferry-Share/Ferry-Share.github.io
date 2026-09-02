@@ -315,7 +315,9 @@ src/
     ui.tsx             buttons, toasts, sheet, icons
   hooks/useSession.ts  binds the session to React
   lib/
-    crypto.ts          PIN, room derivation, ECDH + HKDF, AES-GCM, safety words
+    crypto.ts          PIN, room derivation, ECDH + HKDF, AES-GCM, safety
+                       words, and the rotating reunion code
+    reunion.ts         remembered devices: opt-in, rotating, expiring
     protocol.ts        binary frame format
     signaling.ts       relay client with reconnect and backoff
     transport.ts       WebRTC data channel, relay fallback, backpressure
@@ -402,6 +404,26 @@ mounts on top of it once the bundle arrives.
   sitemap.
 
 ## Behaviour worth knowing
+
+- **Files queue, and go one at a time.** Drop as many as you like: they line
+  up and cross in order, each with its place in the queue, a cancel, and a
+  retry if it fails. One at a time is deliberate — a `CHUNK` frame carries a
+  sequence number and nothing else, so two files on the wire would interleave
+  into each other, and sending in parallel over one link would only make the
+  first file arrive later. The queue holds 50 items.
+
+- **A dropped link rebuilds itself.** The code stays in memory for as long as
+  the tab is open, so a peer that reloads, a phone that sleeps, or a relay
+  socket that dies is recovered without anyone scanning a QR again. Whatever
+  was mid-flight goes back to the front of the queue; everything already
+  received stays on screen. Ferry gives up loudly after eight attempts, and
+  never retries a frame that failed authentication — that is not a flaky link.
+
+- **Devices can remember each other.** Off unless asked for. What gets stored
+  is a one-time code both sides derive from the shared secret, not the code
+  anyone typed, and it rotates on every pairing — so a value copied off disk
+  goes stale, and a code left in a QR grants nothing later. Four devices, seven
+  days, one tap to forget.
 
 - **Received items clear themselves.** Passwords after two minutes, text after
   five, files after fifteen. Each row offers *+2 min* and *Keep*.

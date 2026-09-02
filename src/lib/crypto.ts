@@ -42,6 +42,7 @@ const DOMAIN_PSK = "ferry/v1/psk";
 const INFO_A_TO_B = "ferry/v1/stream/initiator->joiner";
 const INFO_B_TO_A = "ferry/v1/stream/joiner->initiator";
 const INFO_SAS = "ferry/v1/safety-words";
+const INFO_REUNION = "ferry/v1/reunion";
 
 export type Role = "initiator" | "joiner";
 
@@ -52,6 +53,21 @@ export interface SessionKeys {
   inbound: CryptoKey;
   /** Four words shown on both devices for visual confirmation. */
   safetyWords: string[];
+  /**
+   * A pairing code for *next* time, derived by both devices from this
+   * session's shared secret and never shown to anyone.
+   *
+   * Remembering a device stores this rather than the code the user typed.
+   * Two things follow. The code that was read aloud, photographed off a
+   * screen or left in a QR grants nothing later, because it is not what the
+   * reconnect uses. And the stored value rotates on every successful
+   * pairing, so a copy taken from disk goes stale the next time the two
+   * devices meet.
+   *
+   * Both sides derive it from the same material with the same info string,
+   * so they arrive at the same value without exchanging it.
+   */
+  reunionPin: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -197,11 +213,29 @@ export async function deriveSessionKeys(
     64,
   );
 
+  const reunionBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: encoder.encode(INFO_REUNION) },
+    material,
+    PIN_LENGTH * 8,
+  );
+
   return {
     outbound: role === "initiator" ? initiatorToJoiner : joinerToInitiator,
     inbound: role === "initiator" ? joinerToInitiator : initiatorToJoiner,
     safetyWords: wordsFromBits(new Uint8Array(sasBits)),
+    reunionPin: pinFromBytes(new Uint8Array(reunionBits)),
   };
+}
+
+/**
+ * Render key material as a code in the same shape as a typed one, so the
+ * reconnect path can reuse the room derivation and the PIN-salted handshake
+ * unchanged. 256 is an exact multiple of 32, so masking stays uniform.
+ */
+function pinFromBytes(bytes: Uint8Array): string {
+  let pin = "";
+  for (let i = 0; i < PIN_LENGTH; i += 1) pin += ALPHABET[bytes[i] & 31];
+  return pin;
 }
 
 /* ------------------------------------------------------------------ */

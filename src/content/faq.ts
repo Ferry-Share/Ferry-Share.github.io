@@ -63,6 +63,23 @@ export const faqs: Faq[] = [
     featured: true,
   },
   {
+    question: "Can I send several files at once?",
+    answer:
+      "Yes. Drop or pick as many as you like and they queue up, then go one at a time over the same encrypted link. Sending them one after another rather than all at once means each finished file is genuinely finished, and a connection that drops costs you only the file in flight — the rest stay in the queue and carry on afterwards. You can reorder nothing, but you can cancel anything still waiting, and retry anything that failed. The queue holds 50 items, and each file is still capped at 250 MB.",
+    featured: true,
+  },
+  {
+    question: "Do I have to scan the code again if the connection drops?",
+    answer:
+      "No. Ferry keeps the code in memory for as long as the tab is open, so a dropped link, a phone that slept, or a device that wandered off Wi-Fi is rebuilt on its own — the queue picks up where it left off. Separately, you can tick “Remember” while two devices are connected, and each will then offer the other as a one-tap reconnect next time, with no code at all.",
+    featured: true,
+  },
+  {
+    question: "What does “Remember” actually store, and where?",
+    answer:
+      "Only in that browser, never on a server, and never the code you typed. When you pair, both devices independently derive a separate one-time code from the shared secret; that is what gets saved, along with the other device's name. It changes every time you pair, so a copy taken from the browser goes stale, and the code that was read aloud or left in a QR grants nothing later. It is off unless you turn it on, holds at most four devices, forgets itself after seven days, and one tap clears it.",
+  },
+  {
     question: "What happens to what I receive?",
     answer:
       "It clears itself. A received password disappears after two minutes, text after five, a file after fifteen. Each item offers you two more minutes or a button to keep it while the tab stays open, and copying a password offers to wipe your clipboard afterwards. Close the tab and everything goes with it.",

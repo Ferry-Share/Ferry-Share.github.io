@@ -19,6 +19,12 @@ Author: Ashen Wijesingha (https://github.com/AshenWijesingha), Sri Lanka
 ## What it does
 
 - Transfers passwords, text and files between any two devices with a browser.
+- Takes a whole selection of files at once: they queue and cross one at a
+  time, with per-item cancel and retry, and a dropped link resumes the queue
+  rather than losing it.
+- Rebuilds a dropped connection by itself from the code already in memory, so
+  nobody has to scan a QR again mid-transfer. Devices can optionally remember
+  each other for a one-tap reconnect next time.
 - Encrypts end to end in the browser: ECDH P-256, HKDF, AES-256-GCM through
   WebCrypto, with a separate key for each direction.
 - Anchors the key agreement to the pairing code, so the relay cannot
@@ -37,7 +43,7 @@ Author: Ashen Wijesingha (https://github.com/AshenWijesingha), Sri Lanka
 
 ## Limits, stated plainly
 
-- 250 MB per single transfer.
+- 250 MB per single file; up to 50 files may be queued at once.
 - Both people must be at their devices at the same time; there is no inbox and
   no link that still works tomorrow.
 - A pairing room holds exactly two devices, so it is not for group sending.

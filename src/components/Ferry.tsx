@@ -65,7 +65,11 @@ function Shell() {
     if (state.error && state.phase !== "error") toast.push(state.error, "bad");
   }, [state.error, state.phase, toast]);
 
-  const connected = state.phase === "ready";
+  // A pairing that is being rebuilt keeps the workspace on screen. Dropping
+  // back to the chooser would throw away the queue and everything received,
+  // and would put a QR in front of someone whose devices are already paired —
+  // which is the whole problem this avoids.
+  const connected = state.phase === "ready" || (state.reconnecting && state.verified);
 
   return (
     <>

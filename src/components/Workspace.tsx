@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { IncomingItem, OutgoingItem, Session, SessionState } from "@/lib/session";
 import type { ItemKind } from "@/lib/protocol";
 import { useTicker } from "@/hooks/useSession";
+import { isRemembering } from "@/lib/reunion";
 import {
   classNames,
   copyToClipboard,
@@ -40,38 +41,97 @@ export function Workspace({ session, state }: { session: Session; state: Session
 
 function Ribbon({ session, state }: { session: Session; state: SessionState }) {
   const direct = state.transportMode === "direct";
+  const reconnecting = state.reconnecting;
+  // Read at first render rather than in an effect. Ferry is loaded with
+  // `ssr: false`, so this component only ever runs in a browser and there is
+  // no server pass for localStorage to disagree with.
+  const [remembering, setRemembering] = useState(isRemembering);
+  const toast = useToast();
+
+  const toggleRemember = () => {
+    const next = !remembering;
+    setRemembering(next);
+    session.setRemember(next);
+    toast.push(
+      next
+        ? "This device will show up under “pick up where you left off”"
+        : "Forgotten. Remembered devices cleared.",
+      "good",
+    );
+  };
 
   return (
     <div className="overflow-hidden rounded-card bg-hull-900 text-fog-100 shadow-lift dark:bg-hull-900">
       <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-2.5 w-2.5 shrink-0 rounded-full bg-sea-400 shadow-[0_0_10px_2px] shadow-sea-400/50" />
+          <span
+            className={classNames(
+              "flex h-2.5 w-2.5 shrink-0 rounded-full",
+              reconnecting
+                ? "animate-pulse bg-signal-400 shadow-[0_0_10px_2px] shadow-signal-400/50"
+                : "bg-sea-400 shadow-[0_0_10px_2px] shadow-sea-400/50",
+            )}
+          />
           <div className="min-w-0">
             <p className="truncate text-[15px] font-medium">
-              Connected to {state.peerName ?? "the other device"}
+              {reconnecting
+                ? "Reconnecting…"
+                : `Connected to ${state.peerName ?? "the other device"}`}
             </p>
             <p className="truncate text-[13px] text-hull-300">
-              {direct
-                ? "Direct link — your data does not pass through the relay"
-                : "Relayed link — encrypted end to end, the relay only forwards"}
-              {state.roundTripMs !== null ? ` · ${state.roundTripMs} ms` : ""}
+              {reconnecting
+                ? state.notice ??
+                  "Rebuilding the link with the code you already used — nothing to scan."
+                : direct
+                  ? "Direct link — your data does not pass through the relay"
+                  : "Relayed link — encrypted end to end, the relay only forwards"}
+              {!reconnecting && state.roundTripMs !== null
+                ? ` · ${state.roundTripMs} ms`
+                : ""}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <span
+          {/* While the link is being rebuilt there is no route to describe
+              yet, and showing the last one would be a claim about a
+              connection that does not currently exist. */}
+          {reconnecting ? null : (
+            <span
+              className={classNames(
+                "chip shrink-0",
+                direct ? "bg-sea-400/15 text-sea-300" : "bg-signal-400/15 text-signal-300",
+              )}
+            >
+              <Icon name={direct ? "bolt" : "cloud"} className="h-3.5 w-3.5" />
+              {direct ? "Peer to peer" : "Via relay"}
+            </span>
+          )}
+          {reconnecting ? null : (
+            <span className="hidden whitespace-nowrap font-mono text-[12.5px] text-hull-400 lg:inline">
+              {state.safetyWords.join(" · ")}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={remembering}
+            title={
+              remembering
+                ? "Remembered — one tap to reconnect next time"
+                : "Remember this device so you do not have to scan again"
+            }
             className={classNames(
-              "chip shrink-0",
-              direct ? "bg-sea-400/15 text-sea-300" : "bg-signal-400/15 text-signal-300",
+              "hover:bg-white/10 hover:text-white",
+              remembering ? "text-sea-300" : "text-hull-200",
             )}
+            onClick={toggleRemember}
           >
-            <Icon name={direct ? "bolt" : "cloud"} className="h-3.5 w-3.5" />
-            {direct ? "Peer to peer" : "Via relay"}
-          </span>
-          <span className="hidden font-mono text-[12.5px] text-hull-400 sm:inline">
-            {state.safetyWords.join(" · ")}
-          </span>
+            <Icon name={remembering ? "check" : "refresh"} className="h-4 w-4" />
+            <span className="hidden sm:inline">
+              {remembering ? "Remembered" : "Remember"}
+            </span>
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -124,12 +184,25 @@ function Composer({
   const sendFiles = useCallback(
     (files: FileList | null) => {
       if (!files?.length) return;
-      let queued = 0;
-      for (const file of Array.from(files)) {
-        if (session.sendFile(file)) queued += 1;
+      const { accepted, rejected } = session.sendFiles(Array.from(files));
+
+      if (accepted.length) {
+        toast.push(
+          accepted.length === 1
+            ? "1 file queued"
+            : `${accepted.length} files queued — they go one at a time`,
+          "good",
+        );
       }
-      if (queued) {
-        toast.push(queued === 1 ? "Sending 1 file" : `Sending ${queued} files`, "good");
+      // Saying which files did not make it beats a count that silently
+      // disagrees with what the user dropped.
+      if (rejected.length) {
+        toast.push(
+          rejected.length === 1
+            ? rejected[0]
+            : `${rejected.length} files were not queued. ${rejected[0]}`,
+          "bad",
+        );
       }
     },
     [session, toast],
@@ -201,8 +274,9 @@ function Composer({
                 Choose files
               </Button>
               <p className="mt-3 text-[13px] text-hull-500 dark:text-hull-400">
-                Up to 250 MB each. Nothing is uploaded — the bytes stream
-                straight to the other device.
+                Pick as many as you like — they queue and go one at a time, up
+                to 250 MB each. Nothing is uploaded; the bytes stream straight
+                to the other device.
               </p>
             </div>
             <input
@@ -271,54 +345,191 @@ function Composer({
         )}
       </div>
 
-      {outgoing.length > 0 ? (
-        <div className="border-t border-hull-200/70 px-5 py-4 dark:border-hull-800">
-          <h3 className="mb-2.5 text-[13px] font-semibold text-hull-500 dark:text-hull-400">
-            Sent from this device
-          </h3>
-          <ul className="space-y-2">
-            {outgoing.slice(0, 5).map((item) => (
-              <li key={item.id} className="text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex min-w-0 items-center gap-2 text-hull-700 dark:text-hull-200">
-                    <Icon
-                      name={KIND_ICON[item.kind]}
-                      className="h-4 w-4 shrink-0 text-hull-400"
-                    />
-                    <span className="truncate">
-                      {item.name ??
-                        (item.kind === "password" ? "Password" : "Text snippet")}
-                    </span>
-                  </span>
-                  <span
-                    className={classNames(
-                      "shrink-0 text-[13px]",
-                      item.state === "delivered" && "text-sea-600 dark:text-sea-400",
-                      item.state === "failed" && "text-buoy-500",
-                      item.state === "sending" && "text-hull-500 dark:text-hull-400",
-                    )}
-                  >
-                    {item.state === "delivered"
-                      ? "Delivered"
-                      : item.state === "failed"
-                        ? "Failed"
-                        : `${Math.round((item.sent / Math.max(1, item.size)) * 100)}%`}
-                  </span>
-                </div>
-                {item.state === "sending" && item.size > 65_536 ? (
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-hull-200 dark:bg-hull-800">
-                    <div
-                      className="h-full rounded-full bg-sea-500 transition-[width] duration-200"
-                      style={{ width: `${(item.sent / Math.max(1, item.size)) * 100}%` }}
-                    />
-                  </div>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {outgoing.length > 0 ? <SendQueue session={session} outgoing={outgoing} /> : null}
     </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* The send queue                                                      */
+/* ------------------------------------------------------------------ */
+
+const OUTGOING_LABEL: Record<OutgoingItem["state"], string> = {
+  queued: "Waiting",
+  sending: "Sending",
+  delivered: "Delivered",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};
+
+/**
+ * What is going, what is waiting behind it, and what did not make it.
+ *
+ * Items go one at a time, so the honest thing to show is a line: the file on
+ * the wire with its progress, and everything else with its place in the
+ * queue rather than a progress bar that will sit at nothing.
+ */
+function SendQueue({
+  session,
+  outgoing,
+}: {
+  session: Session;
+  outgoing: OutgoingItem[];
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const toast = useToast();
+
+  const waiting = outgoing.filter((item) => item.state === "queued").length;
+  const failed = outgoing.filter(
+    (item) => item.state === "failed" && item.retryable,
+  ).length;
+  const finished = outgoing.filter(
+    (item) => item.state !== "queued" && item.state !== "sending",
+  ).length;
+
+  // Oldest first while there is a queue: a line reads top to bottom, and the
+  // next file to go is the one people look for.
+  const ordered = waiting > 0 ? [...outgoing].reverse() : outgoing;
+  const rows = showAll ? ordered : ordered.slice(0, 6);
+
+  return (
+    <div className="border-t border-hull-200/70 px-5 py-4 dark:border-hull-800">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[13px] font-semibold text-hull-500 dark:text-hull-400">
+          {waiting > 0
+            ? `Queue — ${waiting} waiting`
+            : "Sent from this device"}
+        </h3>
+        <div className="flex items-center gap-1">
+          {failed > 0 ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const again = session.retryAllFailed();
+                if (again) toast.push(`Retrying ${again}`, "good");
+              }}
+            >
+              Retry failed
+            </Button>
+          ) : null}
+          {waiting > 0 ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const dropped = session.cancelQueued();
+                if (dropped) toast.push(`Cleared ${dropped} from the queue`, "good");
+              }}
+            >
+              Clear queue
+            </Button>
+          ) : null}
+          {finished > 0 && waiting === 0 ? (
+            <Button size="sm" variant="ghost" onClick={() => session.clearOutgoingHistory()}>
+              Clear
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <ul className="space-y-2">
+        {rows.map((item) => (
+          <li key={item.id} className="text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex min-w-0 items-center gap-2 text-hull-700 dark:text-hull-200">
+                {item.state === "queued" ? (
+                  <span
+                    className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-hull-200 font-mono text-[10px] font-bold text-hull-600 dark:bg-hull-800 dark:text-hull-300"
+                    aria-hidden="true"
+                  >
+                    {item.place}
+                  </span>
+                ) : (
+                  <Icon
+                    name={KIND_ICON[item.kind]}
+                    className="h-4 w-4 shrink-0 text-hull-400"
+                  />
+                )}
+                <span
+                  className={classNames(
+                    "truncate",
+                    (item.state === "cancelled" || item.state === "queued") &&
+                      "text-hull-500 dark:text-hull-400",
+                  )}
+                >
+                  {item.name ??
+                    (item.kind === "password" ? "Password" : "Text snippet")}
+                </span>
+              </span>
+
+              <span className="flex shrink-0 items-center gap-2">
+                <span
+                  className={classNames(
+                    "text-[13px]",
+                    item.state === "delivered" && "text-sea-600 dark:text-sea-400",
+                    item.state === "failed" && "text-buoy-500",
+                    (item.state === "sending" ||
+                      item.state === "queued" ||
+                      item.state === "cancelled") &&
+                      "text-hull-500 dark:text-hull-400",
+                  )}
+                >
+                  {item.state === "sending"
+                    ? `${Math.round((item.sent / Math.max(1, item.size)) * 100)}%`
+                    : item.state === "queued"
+                      ? item.place === 1
+                        ? "Next"
+                        : `${item.place} in line`
+                      : OUTGOING_LABEL[item.state]}
+                </span>
+
+                {item.state === "queued" || item.state === "sending" ? (
+                  <button
+                    type="button"
+                    onClick={() => session.cancelOutgoing(item.id)}
+                    aria-label={`Cancel ${item.name ?? "item"}`}
+                    className="rounded-md p-1 text-hull-400 hover:bg-hull-100 hover:text-hull-700 dark:hover:bg-hull-800 dark:hover:text-fog-100"
+                  >
+                    <Icon name="close" className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+
+                {(item.state === "failed" || item.state === "cancelled") &&
+                item.retryable ? (
+                  <button
+                    type="button"
+                    onClick={() => session.retryOutgoing(item.id)}
+                    className="rounded-md px-1.5 py-0.5 text-[12.5px] font-medium text-sea-600 hover:underline dark:text-sea-400"
+                  >
+                    Retry
+                  </button>
+                ) : null}
+              </span>
+            </div>
+
+            {item.state === "sending" && item.size > 65_536 ? (
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-hull-200 dark:bg-hull-800">
+                <div
+                  className="h-full rounded-full bg-sea-500 transition-[width] duration-200"
+                  style={{ width: `${(item.sent / Math.max(1, item.size)) * 100}%` }}
+                />
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+
+      {ordered.length > rows.length || showAll ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((open) => !open)}
+          className="mt-2.5 text-[13px] font-medium text-sea-600 hover:underline dark:text-sea-400"
+        >
+          {showAll ? "Show fewer" : `Show all ${ordered.length}`}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
