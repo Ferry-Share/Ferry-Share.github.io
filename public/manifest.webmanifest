@@ -1,15 +1,24 @@
 {
-  "name": "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
-  "short_name": "Ferry LK",
-  "description": "Securely transfer passwords, text, and files between your devices in Sri Lanka with end-to-end encryption.",
-  "lang": "en-LK",
+  "name": "Ferry — Secure File Sharing Between Your Devices",
+  "short_name": "Ferry",
+  "description": "Send passwords, text and files straight between your devices, end-to-end encrypted. No account, no uploads, nothing stored.",
+  "lang": "en",
+  "dir": "ltr",
   "categories": [
     "productivity",
     "utilities",
     "security"
   ],
+  "id": "/",
   "start_url": ".",
+  "scope": ".",
   "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  "orientation": "any",
   "background_color": "#F1F5F4",
   "theme_color": "#0C1D23",
   "icons": [

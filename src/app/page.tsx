@@ -1,21 +1,23 @@
-"use client";
+import { FerryApp } from "@/components/FerryApp";
+import { HomeContent } from "@/components/HomeContent";
+import { SiteFooter } from "@/components/SiteChrome";
 
-import dynamic from "next/dynamic";
-
-// The whole app is browser-only: it depends on WebCrypto, WebRTC and the
-// camera. Rendering it on the client avoids a hydration pass that could never
-// match anyway.
-const Ferry = dynamic(() => import("@/components/Ferry"), {
-  ssr: false,
-  loading: () => (
-    <div className="mx-auto flex min-h-dvh max-w-5xl items-center justify-center px-6">
-      <div className="h-1 w-40 overflow-hidden rounded-full bg-hull-200 dark:bg-hull-800">
-        <div className="h-full w-1/3 rounded-full bg-sea-500 animate-sweep" />
-      </div>
-    </div>
-  ),
-});
-
+/**
+ * The front page: the app, then the page about the app.
+ *
+ * This file is a server component even though the app inside it is not. The
+ * app fills the first screen and needs a browser to exist at all; everything
+ * under it is prose, rendered here to plain HTML so it is in the document for
+ * anyone — or anything — that reads the page without running JavaScript.
+ */
 export default function Page() {
-  return <Ferry />;
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-col px-4 pb-12 sm:px-6">
+      <div className="flex min-h-dvh flex-col">
+        <FerryApp />
+      </div>
+      <HomeContent />
+      <SiteFooter />
+    </div>
+  );
 }

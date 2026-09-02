@@ -11,6 +11,8 @@ encrypted end to end, and nothing is stored anywhere afterwards.
 
 [**Open Ferry**](https://ferry-share.github.io) &nbsp;·&nbsp;
 [How it works](https://ferry-share.github.io/how-it-works/) &nbsp;·&nbsp;
+[FAQ](https://ferry-share.github.io/faq/) &nbsp;·&nbsp;
+[Compare](https://ferry-share.github.io/compare/) &nbsp;·&nbsp;
 [About](https://ferry-share.github.io/about/)
 
 <sub>
@@ -289,16 +291,24 @@ add TURN credentials under Settings.
 ```
 src/
   app/
-    page.tsx           the app itself, client-only
+    page.tsx           the front page: the app, then the page about it
     about/             About Ferry, static HTML
     how-it-works/      the long explanation, static HTML
-    site.ts            one place for the site's own URLs
-    robots.ts          generated, so the sitemap line stays absolute
+    faq/               every question, and its FAQPage markup
+    compare/           Ferry next to AirDrop, WeTransfer and the rest
+    site.ts            one place for the site's own URLs and its summary
+    robots.ts          generated; names the AI crawlers explicitly
     sitemap.ts         generated, one entry per page
     layout.tsx         fonts, metadata, structured data
+  content/
+    faq.ts             the questions, shared by the FAQ page, its markup
+                       and the short set on the front page
   components/
-    SiteChrome.tsx     header and footer for the written pages
-    Ferry.tsx          shell, header, settings, how-it-works
+    SiteChrome.tsx     header, footer and breadcrumbs for the written pages
+    HomeContent.tsx    the front page's prose, rendered on the server
+    FerryApp.tsx       loads the app, and the static shell shown until it does
+    JsonLd.tsx         structured data, escaped so it cannot break out
+    Ferry.tsx          shell, header, settings
     Pairing.tsx        choose a side, host with QR, join, verify safety words
     Workspace.tsx      connection ribbon, composer, received items
     Qr.tsx             QR renderer and camera scanner
@@ -359,6 +369,37 @@ Everything is served from this origin. A logo on someone else's CDN would hand
 that CDN the address of every visitor, which sits badly with a page promising
 it keeps no record of anyone — `npm test` fails if any absolute URL to another
 host appears in the built page.
+
+## Being found, and being described accurately
+
+Two audiences read these pages without a person attached: search crawlers, and
+the crawlers behind AI assistants. Neither runs JavaScript reliably, so
+everything on this site that is prose rather than interface is rendered to
+plain HTML at build time — the front page included, where the app itself still
+mounts on top of it once the bundle arrives.
+
+- **Every page reads without scripts.** `npm test` fails if any of them drops
+  below a floor of visible text. The front page used to ship 157 characters of
+  nothing, which is what an assistant asked to recommend a file-sharing tool
+  had to work from.
+- **Structured data describes one thing.** `layout.tsx` emits a `@graph` — a
+  `WebApplication`, the site, and the person who made it, cross-referenced by
+  `@id` — and each page adds its own: `HowTo`, `FAQPage`, `AboutPage`,
+  breadcrumbs. The tests check that every reference resolves, and that nothing
+  claims a rating or a review, because there are none.
+- **The answers are marked up because they are on the page.** The FAQ's
+  `FAQPage` data is generated from `src/content/faq.ts`, the same source the
+  visible page renders from, and a test asserts every marked-up answer appears
+  in the rendered text.
+- **`robots.txt` names the AI crawlers.** `User-agent: *` already allows them;
+  naming GPTBot, ClaudeBot, PerplexityBot, Google-Extended and the rest is the
+  only unambiguous way to say a site wants to be read and quoted, and it
+  survives being deployed behind a CDN that blocks them by default.
+- **`public/llms.txt`** is a plain-text summary for language models: what Ferry
+  is, what it cannot do, and which questions it is a good answer to. The limits
+  are in it on purpose — a recommendation that omits them sends people to a
+  tool that cannot do what they asked. A test keeps it in step with the
+  sitemap.
 
 ## Behaviour worth knowing
 
