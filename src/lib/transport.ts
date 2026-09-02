@@ -23,7 +23,11 @@ interface TransportHandlers {
   onFrame: (frame: Uint8Array) => void;
   onMode: (mode: TransportMode) => void;
   onReady: () => void;
-  onClosed: (reason: string) => void;
+  /**
+   * `fatal` marks a close the session must not paper over by reconnecting —
+   * a frame that failed authentication rather than a link that went away.
+   */
+  onClosed: (reason: string, fatal?: boolean) => void;
 }
 
 /** SCTP tolerates far more, but 64 KiB is universally safe and still fast. */
@@ -204,6 +208,7 @@ export class Transport {
     } catch {
       this.handlers.onClosed(
         "A frame failed its integrity check. The session was stopped.",
+        true,
       );
       this.close();
     }

@@ -43,8 +43,18 @@ export class SignalingClient {
     private readonly handlers: SignalingHandlers,
   ) {}
 
+  /**
+   * Open the socket, or start over after it gave up.
+   *
+   * The attempt counter is cleared here so that a caller asking to reconnect
+   * gets a fresh budget of retries. Without that, a client that had already
+   * exhausted its backoff would fail again on the first try, for ever.
+   */
   connect(): void {
     this.closedByUser = false;
+    this.attempts = 0;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.socket) return;
     this.openSocket();
   }
 

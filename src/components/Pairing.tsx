@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatPin, isCompletePin, normalizePin, PIN_LENGTH } from "@/lib/crypto";
 import type { Session, SessionState } from "@/lib/session";
+import {
+  daysLeft,
+  forget,
+  listRemembered,
+  type RememberedDevice,
+} from "@/lib/reunion";
 import { copyToClipboard } from "@/lib/utils";
 import { Button, Icon, useToast } from "./ui";
 import { QrCode, QrScanner } from "./Qr";
@@ -53,6 +59,16 @@ export function Pairing({
     setMode("choose");
   }, [session]);
 
+  // Declared with the other callbacks, above the early returns below, so the
+  // hook order never depends on which screen is showing.
+  const reconnect = useCallback(
+    (device: RememberedDevice) => {
+      setMode("join");
+      void session.join(device.pin);
+    },
+    [session],
+  );
+
   if (state.phase === "verifying") {
     return <Verify session={session} state={state} onAbort={abort} />;
   }
@@ -82,16 +98,77 @@ export function Pairing({
     );
   }
 
-  return <Choose onHost={startHosting} onJoin={() => setMode("join")} />;
+  return (
+    <Choose
+      onHost={startHosting}
+      onJoin={() => setMode("join")}
+      onReconnect={reconnect}
+    />
+  );
 }
 
 /* ------------------------------------------------------------------ */
 /* Step 1 — pick a side                                                */
 /* ------------------------------------------------------------------ */
 
-function Choose({ onHost, onJoin }: { onHost: () => void; onJoin: () => void }) {
+function Choose({
+  onHost,
+  onJoin,
+  onReconnect,
+}: {
+  onHost: () => void;
+  onJoin: () => void;
+  onReconnect: (device: RememberedDevice) => void;
+}) {
+  // Read at first render: Ferry is loaded with `ssr: false`, so there is no
+  // server pass for a stored list to disagree with.
+  const [devices, setDevices] = useState<RememberedDevice[]>(listRemembered);
+
   return (
     <div className="plate overflow-hidden">
+      {devices.length > 0 ? (
+        <div className="border-b border-hull-200/70 bg-fog-50 px-6 py-5 sm:px-8 dark:border-hull-800 dark:bg-hull-950/40">
+          <h3 className="text-[13px] font-semibold text-hull-500 dark:text-hull-400">
+            Pick up where you left off
+          </h3>
+          <ul className="mt-3 space-y-2">
+            {devices.map((device) => (
+              <li key={device.id} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onReconnect(device)}
+                  className="panel flex flex-1 items-center gap-3 p-3 text-left transition-colors hover:border-sea-400 dark:hover:border-sea-500"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sea-600/10 text-sea-600 dark:bg-sea-400/15 dark:text-sea-400">
+                    <Icon name="refresh" className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[15px] font-medium">
+                      {device.label}
+                    </span>
+                    <span className="block text-[13px] text-hull-500 dark:text-hull-400">
+                      Reconnect — forgets itself in {daysLeft(device)} days
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDevices(forget(device.id))}
+                  aria-label={`Forget ${device.label}`}
+                  className="rounded-lg p-2 text-hull-400 hover:bg-hull-100 hover:text-hull-700 dark:hover:bg-hull-800 dark:hover:text-fog-100"
+                >
+                  <Icon name="close" className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-[12.5px] text-hull-500 dark:text-hull-400">
+            The other device has to be on this page too. It never stores the
+            code you typed — only a one-time code that changes every time you
+            pair.
+          </p>
+        </div>
+      ) : null}
       <div className="border-b border-hull-200/70 px-6 py-7 sm:px-8 dark:border-hull-800">
         <h2 className="text-2xl font-semibold sm:text-[28px]">
           Open a crossing between two devices
