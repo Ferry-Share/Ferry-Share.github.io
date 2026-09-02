@@ -37,7 +37,10 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
+  title: {
+    default: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
+    template: "%s — Ferry",
+  },
   description:
     "Ferry is a fast, secure file sharing app for Sri Lanka. Move passwords, text, and files between your devices with end-to-end encryption and no account required.",
   keywords: [
@@ -64,7 +67,10 @@ export const metadata: Metadata = {
     shortcut: asset("favicon.ico"),
   },
   openGraph: {
-    title: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
+    title: {
+    default: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
+    template: "%s — Ferry",
+  },
     description:
       "Securely transfer files, text, and passwords between your devices in Sri Lanka with Ferry. End-to-end encrypted and no data stored.",
     type: "website",
@@ -78,13 +84,17 @@ export const metadata: Metadata = {
         url: socialCard,
         width: 1200,
         height: 630,
+        type: "image/png",
         alt: "Ferry — hand a password, a paragraph or a file to your other device.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
+    title: {
+    default: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
+    template: "%s — Ferry",
+  },
     description:
       "Private file and text sharing for Sri Lankan users. End-to-end encrypted, account-free, and instant across devices.",
     images: [socialCard],

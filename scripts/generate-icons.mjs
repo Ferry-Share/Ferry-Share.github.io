@@ -38,6 +38,8 @@ const MARGIN = 0.07;
 /** Brand colours, matching tailwind.config.ts. */
 const HULL_950 = "#061217";
 const HULL_300 = "#8FAEB2";
+const SEA_500 = "#17A292";
+const SEA_300 = "#6FD5C6";
 const SIGNAL_400 = "#F7C445";
 const PAPER = "#FFFFFF";
 
@@ -114,14 +116,22 @@ async function maskable(mark, size) {
     .toBuffer();
 }
 
-/** 1200x630 is what every social platform crops to. */
+/**
+ * The share banner: 1200x630, which is the shape WhatsApp, Slack, X and the
+ * rest crop to.
+ *
+ * Written as a palette PNG. WhatsApp quietly drops the preview image when it
+ * is much over 300 KB, and the full-colour version of this card lands close
+ * enough to that to be worth not risking; the palette version is a quarter of
+ * the size with no visible banding, and unlike JPEG it leaves the text crisp.
+ */
 async function socialCard() {
   const W = 1200;
   const H = 630;
-  const TILE = 400;
+  const TILE = 372;
 
   const tile = await sharp(await square(SOURCE, TILE))
-    .composite([{ input: roundedMask(TILE, 56), blend: "dest-in" }])
+    .composite([{ input: roundedMask(TILE, 52), blend: "dest-in" }])
     .png()
     .toBuffer();
 
@@ -129,20 +139,26 @@ async function socialCard() {
     <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
       <rect width="${W}" height="${H}" fill="${HULL_950}"/>
       <rect x="0" y="0" width="${W}" height="8" fill="${SIGNAL_400}"/>
-      <g font-family="DejaVu Sans, Verdana, sans-serif" fill="${PAPER}">
-        <text x="560" y="250" font-size="62" font-weight="bold">Hand it to your</text>
-        <text x="560" y="326" font-size="62" font-weight="bold">other device.</text>
-        <text x="560" y="396" font-size="30" fill="${HULL_300}">A password, a paragraph, a file.</text>
-        <text x="560" y="442" font-size="30" fill="${HULL_300}">Encrypted end to end. Nothing kept.</text>
-      </g>
       <g font-family="DejaVu Sans, Verdana, sans-serif">
-        <text x="560" y="520" font-size="26" font-weight="bold" fill="${SIGNAL_400}">ferry-share.github.io</text>
+        <text x="536" y="232" font-size="60" font-weight="bold" fill="${PAPER}">Hand it to your</text>
+        <text x="536" y="304" font-size="60" font-weight="bold" fill="${PAPER}">other device.</text>
+        <text x="536" y="372" font-size="29" fill="${HULL_300}">A password, a paragraph, a file —</text>
+        <text x="536" y="412" font-size="29" fill="${HULL_300}">straight across, in seconds.</text>
+
+        <!-- Pill width measured against the rendered text: at 22px this line
+             is 519px wide, so 557 leaves an even 24px inset either side. -->
+        <g transform="translate(536,452)">
+          <rect x="0" y="0" width="557" height="46" rx="23" fill="${SEA_500}" fill-opacity="0.16"/>
+          <text x="24" y="31" font-size="22" font-weight="bold" fill="${SEA_300}">End-to-end encrypted · No account · Free</text>
+        </g>
+
+        <text x="536" y="556" font-size="25" font-weight="bold" fill="${SIGNAL_400}">ferry-share.github.io</text>
       </g>
     </svg>`);
 
   return sharp(backdrop)
-    .composite([{ input: tile, top: Math.round((H - TILE) / 2), left: 96 }])
-    .png({ compressionLevel: 9 })
+    .composite([{ input: tile, top: Math.round((H - TILE) / 2), left: 92 }])
+    .png({ compressionLevel: 9, palette: true })
     .toBuffer();
 }
 

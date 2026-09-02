@@ -171,8 +171,8 @@ function Hero() {
       </h1>
       <p className="mt-4 max-w-prose text-[17px] text-hull-600 dark:text-hull-300">
         A password, a paragraph, a file. Ferry moves it across in a couple of
-        seconds for people in Sri Lanka and everywhere else, encrypted the
-        whole way, and keeps nothing once you close the tab.
+        seconds, encrypted the whole way, and keeps nothing once you close the
+        tab.
       </p>
     </section>
   );
@@ -227,13 +227,21 @@ function Footer({ onOpenSettings }: { onOpenSettings: () => void }) {
         Ferry keeps no accounts, no logs and no copies. Close the tab and the
         session is gone.
       </p>
-      <button
-        type="button"
-        onClick={onOpenSettings}
-        className="self-start font-medium text-sea-600 hover:underline dark:text-sea-400"
-      >
-        Relay and network settings
-      </button>
+      <div className="flex flex-wrap items-center gap-4">
+        <a href="/how-it-works/" className="hover:underline">
+          How it works
+        </a>
+        <a href="/about/" className="hover:underline">
+          About
+        </a>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="font-medium text-sea-600 hover:underline dark:text-sea-400"
+        >
+          Relay and network settings
+        </button>
+      </div>
     </footer>
   );
 }

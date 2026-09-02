@@ -1,22 +1,67 @@
-# Ferry
+<div align="center">
 
-Hand a password, a piece of text or a file from one device to another. The two
-browsers talk directly wherever the network allows it, everything is encrypted
-end to end, and nothing is stored anywhere afterwards.
+<img src="public/opengraph-image.png" alt="Ferry — hand a password, a paragraph or a file to your other device. End-to-end encrypted, no account, free." width="820">
 
-Built with Next.js as a static export, so the whole front end runs from GitHub
-Pages. The rendezvous relay lives in the same repository under `server/`.
+<h1>Ferry</h1>
+
+**Hand a password, a piece of text or a file from one device to another.**
+
+The two browsers talk directly wherever the network allows it, everything is
+encrypted end to end, and nothing is stored anywhere afterwards.
+
+[**Open Ferry**](https://ferry-share.github.io) &nbsp;·&nbsp;
+[How it works](https://ferry-share.github.io/how-it-works/) &nbsp;·&nbsp;
+[About](https://ferry-share.github.io/about/)
+
+<sub>
+No account &nbsp;·&nbsp; Nothing stored &nbsp;·&nbsp; Nothing logged &nbsp;·&nbsp;
+MIT licensed &nbsp;·&nbsp; Free
+</sub>
+
+</div>
 
 ---
 
-## Read this first: GitHub Pages and the relay
+## The short version
+
+You want a password off your laptop and onto your phone. The usual routes all
+go through somebody else: email it and it sits on a mail server, drop it in a
+chat and it lands in that company's storage, upload it and now the link is the
+secret and the file is on a disk you do not control.
+
+Ferry opens a channel straight between the two browsers instead:
+
+```
+  1. One device mints a ten-character code and shows it as a QR
+  2. The other scans it, or you type the ten characters
+  3. Both screens show four words — if they match, nobody is in the middle
+  4. Send. Passwords, text, files up to 250 MB
+```
+
+It takes about ten seconds, and when you close the tab there is nothing left
+to delete.
+
+## What it is built from
+
+| Piece | What it is | Where it runs |
+| --- | --- | --- |
+| Front end | Next.js, exported to static files | GitHub Pages |
+| Relay | ~200 lines of JavaScript over WebSockets | Cloudflare Workers, or any Node host |
+| Transport | WebRTC data channel, relay as fallback | Between the two browsers |
+| Crypto | WebCrypto — ECDH P-256, HKDF, AES-256-GCM | In the browser, nowhere else |
+
+---
+
+## Why there is a relay at all
 
 GitHub Pages serves static files. It cannot run Node, and it cannot hold a
 WebSocket open. Two browsers that have never met need *something* to introduce
 them, so a pairing tool always needs one small always-on process.
 
-Ferry keeps both halves in this one repository and gives you two ways to run
-them.
+That process is treated as hostile by design — see
+[How it works](https://ferry-share.github.io/how-it-works/) for why it cannot
+read anything it carries. Ferry keeps both halves in this one repository and
+gives you two ways to run them.
 
 **Same network — one command, no hosting at all**
 
@@ -243,8 +288,16 @@ add TURN credentials under Settings.
 
 ```
 src/
-  app/                 Next.js app router — layout, page, global styles
+  app/
+    page.tsx           the app itself, client-only
+    about/             About Ferry, static HTML
+    how-it-works/      the long explanation, static HTML
+    site.ts            one place for the site's own URLs
+    robots.ts          generated, so the sitemap line stays absolute
+    sitemap.ts         generated, one entry per page
+    layout.tsx         fonts, metadata, structured data
   components/
+    SiteChrome.tsx     header and footer for the written pages
     Ferry.tsx          shell, header, settings, how-it-works
     Pairing.tsx        choose a side, host with QR, join, verify safety words
     Workspace.tsx      connection ribbon, composer, received items
@@ -273,9 +326,21 @@ test/
   lan.test.js          the LAN host serves ./out and nothing else
   worker.test.mjs      the Worker relay matches the Node one, and routing
   config.test.mjs      which relay a browser ends up talking to
-  seo.test.mjs         what the built page tells crawlers, and that it
-                       loads nothing from a third party
+  seo.test.mjs         what the built pages tell crawlers, that they load
+                       nothing from a third party, and that the share
+                       banner stays small enough for WhatsApp
 ```
+
+## Sharing a link
+
+Paste the address into WhatsApp, Slack, X or an iMessage and the preview shows
+the banner at the top of this file: the mark, the line, and what it costs. The
+card is `public/opengraph-image.png`, generated at 1200×630 — the shape every
+platform crops to — and kept under 100 KB, because WhatsApp quietly drops the
+picture somewhere near 300 KB and tells you nothing about why.
+
+`npm test` fails if that card stops being 1200×630, grows past the limit, or
+stops matching what the page declares.
 
 ## Branding and search
 

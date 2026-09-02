@@ -19,8 +19,15 @@ const built = fs.existsSync(path.join(out, "index.html"));
 const skip = built ? false : "run `npm run build` first";
 
 const read = (file) => fs.readFileSync(path.join(out, file), "utf8");
-const html = () => read("index.html");
-const head = () => html().split("</head>")[0];
+const html = (page = "index.html") => read(page);
+const head = (page) => html(page).split("</head>")[0];
+
+/** Every page the site publishes, and where its HTML lands in the export. */
+const PAGES = [
+  { route: "/", file: "index.html" },
+  { route: "/how-it-works/", file: "how-it-works/index.html" },
+  { route: "/about/", file: "about/index.html" },
+];
 
 /** Width and height straight out of a PNG's IHDR chunk. */
 function pngSize(file) {
@@ -42,14 +49,19 @@ test("nothing on the page is fetched from a third party", { skip }, () => {
     "http://www.w3.org", // SVG namespaces
   ];
 
-  const urls = [...html().matchAll(/https?:\/\/[^"'\s<>\\)]+/g)].map((m) => m[0]);
-  const foreign = urls.filter((url) => !allowed.some((ok) => url.startsWith(ok)));
+  const allowedLinks = ["https://github.com/"]; // credited, never fetched
 
-  assert.deepEqual(
-    [...new Set(foreign)],
-    [],
-    "these are served by someone else and would leak visitors to them",
-  );
+  for (const { file } of PAGES) {
+    const urls = [...html(file).matchAll(/https?:\/\/[^"'\s<>\\)]+/g)].map((m) => m[0]);
+    const foreign = urls.filter(
+      (url) => ![...allowed, ...allowedLinks].some((ok) => url.startsWith(ok)),
+    );
+    assert.deepEqual(
+      [...new Set(foreign)],
+      [],
+      `${file} pulls from someone else, which would leak visitors to them`,
+    );
+  }
 });
 
 test("the page states which address is canonical", { skip }, () => {
@@ -147,4 +159,88 @@ test("the manifest installs with self-hosted icons", { skip }, () => {
     manifest.icons.some((i) => i.purpose === "maskable"),
     "needs a maskable icon or launchers will crop the ship",
   );
+});
+
+/* ---------------------------------------------------------------- */
+/* Sharing, and the written pages                                    */
+/* ---------------------------------------------------------------- */
+
+test("the share banner is small enough for WhatsApp to fetch", { skip }, () => {
+  const bytes = fs.statSync(path.join(out, "opengraph-image.png")).size;
+  // WhatsApp quietly drops the preview image somewhere around 300 KB — the
+  // link still previews, just with no picture, and nothing tells you why.
+  assert.ok(
+    bytes < 300 * 1024,
+    `the banner is ${(bytes / 1024).toFixed(0)} KB; WhatsApp starts dropping it near 300 KB`,
+  );
+  assert.equal(
+    attr(head("index.html"), /<meta property="og:image:type" content="([^"]+)"/),
+    "image/png",
+    "declare the type or some scrapers guess wrong",
+  );
+});
+
+test("every page carries its own title, description and canonical", { skip }, () => {
+  const seen = new Set();
+
+  for (const { route, file } of PAGES) {
+    const source = head(file);
+
+    const title = source.match(/<title>([^<]+)<\/title>/)?.[1];
+    assert.ok(title, `${file} has no title`);
+    assert.ok(!seen.has(title), `${file} repeats the title "${title}"`);
+    seen.add(title);
+
+    assert.ok(
+      attr(source, /<meta name="description" content="([^"]+)"/),
+      `${file} has no description`,
+    );
+
+    const canonical = attr(source, /<link rel="canonical" href="([^"]+)"/);
+    assert.equal(
+      canonical,
+      `https://ferry-share.github.io${route}`,
+      `${file} points its canonical somewhere unexpected`,
+    );
+  }
+});
+
+test("the written pages are readable without JavaScript", { skip }, () => {
+  // The app itself cannot be — it needs WebCrypto and a camera — but a page
+  // explaining how it works should reach a crawler as prose, not a spinner.
+  for (const file of ["how-it-works/index.html", "about/index.html"]) {
+    const body = html(file).split("<body")[1] ?? "";
+    const text = body.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<[^>]+>/g, " ");
+    assert.ok(
+      text.replace(/\s+/g, " ").trim().length > 1500,
+      `${file} renders almost no text without scripts`,
+    );
+  }
+});
+
+test("the sitemap lists every page", { skip }, () => {
+  const sitemap = read("sitemap.xml");
+  for (const { route } of PAGES) {
+    assert.ok(
+      sitemap.includes(`<loc>https://ferry-share.github.io${route}</loc>`),
+      `${route} is missing from the sitemap`,
+    );
+  }
+});
+
+test("the settings and theme controls are not the same drawing", { skip }, () => {
+  // They were: a circle with eight spokes each, sitting next to each other in
+  // the header, so the gear read as a second sun.
+  const ui = fs.readFileSync(path.join(root, "src/components/ui.tsx"), "utf8");
+  const gear = ui.match(/settings: \(([\s\S]*?)\),/)?.[1] ?? "";
+  const ferry = fs.readFileSync(path.join(root, "src/components/Ferry.tsx"), "utf8");
+  const sun = ferry.match(/function SunGlyph[\s\S]*?\n}/)?.[0] ?? "";
+
+  const paths = (source) => (source.match(/d="([^"]+)"/g) ?? []).join(" ");
+  assert.ok(gear && sun, "could not find both icons to compare");
+  assert.notEqual(paths(gear), paths(sun), "the two icons share their geometry");
+
+  // The sun is spokes: many short move-and-line pairs. The gear is one closed
+  // outline. A closed path is the thing that makes it read as a cog.
+  assert.ok(paths(gear).includes("Z"), "the gear should be a closed outline");
 });
