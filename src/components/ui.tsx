@@ -236,10 +236,13 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M7.2 10.2l2 2 3.6-4" />
     </>
   ),
+  // A notched cog, not a circle with spokes: the spoked version was the sun
+  // from the theme toggle with a smaller middle, and the two sat side by side
+  // in the header looking like the same control twice.
   settings: (
     <>
-      <circle cx="10" cy="10" r="2.6" />
-      <path d="M10 2.6v2.2M10 15.2v2.2M17.4 10h-2.2M4.8 10H2.6M15.2 4.8l-1.5 1.5M6.3 13.7l-1.5 1.5M15.2 15.2l-1.5-1.5M6.3 6.3L4.8 4.8" />
+      <path d="M8.25 2.19 L11.75 2.19 L11.79 4.27 L14.06 5.58 L15.89 4.58 L17.63 7.61 L15.86 8.69 L15.86 11.31 L17.63 12.39 L15.89 15.42 L14.06 14.42 L11.79 15.73 L11.75 17.81 L8.25 17.81 L8.21 15.73 L5.94 14.42 L4.11 15.42 L2.37 12.39 L4.14 11.31 L4.14 8.69 L2.37 7.61 L4.11 4.58 L5.94 5.58 L8.21 4.27 Z" />
+      <circle cx="10" cy="10" r="3" />
     </>
   ),
   camera: (

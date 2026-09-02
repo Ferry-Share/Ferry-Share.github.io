@@ -10,3 +10,6 @@ export const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 /** The page's own address, base path included. */
 export const pageUrl = `${siteUrl}${basePath || "/"}`;
+
+/** Where the source lives. Linked from the footer and the written pages. */
+export const repoUrl = "https://github.com/Ferry-Share/Ferry-Share.github.io";
