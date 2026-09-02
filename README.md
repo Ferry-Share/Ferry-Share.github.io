@@ -258,6 +258,10 @@ src/
     transport.ts       WebRTC data channel, relay fallback, backpressure
     session.ts         state machine, send queue, receive assembly, expiry
     config.ts          relay resolution, ICE servers, device labels
+assets/
+  logo.png             the one source image every icon is cut from
+scripts/
+  generate-icons.mjs   cuts it, via `npm run icons`
 server/
   relay.js             the rendezvous relay, for any Node host
   lan.js               static host + relay in one process
@@ -269,7 +273,27 @@ test/
   lan.test.js          the LAN host serves ./out and nothing else
   worker.test.mjs      the Worker relay matches the Node one, and routing
   config.test.mjs      which relay a browser ends up talking to
+  seo.test.mjs         what the built page tells crawlers, and that it
+                       loads nothing from a third party
 ```
+
+## Branding and search
+
+The favicon, the installed-app icons and the social card are all cut from
+`assets/logo.png`. Replace that file and run:
+
+```bash
+npm run icons
+```
+
+Small icons are cut from the ship alone, because the wordmark under it turns
+to mush below about 64px; the social card, which is read at size, uses the
+whole lockup on a dark ground.
+
+Everything is served from this origin. A logo on someone else's CDN would hand
+that CDN the address of every visitor, which sits badly with a page promising
+it keeps no record of anyone — `npm test` fails if any absolute URL to another
+host appears in the built page.
 
 ## Behaviour worth knowing
 

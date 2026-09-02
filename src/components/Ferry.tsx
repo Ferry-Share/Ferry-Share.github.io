@@ -11,13 +11,11 @@ import {
   isValidRelayUrl,
   setRelayUrl,
   setTurnConfig,
+  withBasePath,
 } from "@/lib/config";
 import { Button, Icon, Sheet, ToastHost, useToast } from "./ui";
 import { Pairing } from "./Pairing";
 import { Workspace } from "./Workspace";
-
-const LOGO_URL =
-  "https://res.cloudinary.com/dkj22lm1g/image/upload/v1788291772/Ferry_zs4ns4.webp";
 
 export default function Ferry() {
   return (
@@ -133,14 +131,17 @@ function Header({ onOpenSettings }: { onOpenSettings: () => void }) {
 }
 
 function AppLogo() {
+  // The ship on its own: the wordmark is already next to it in the header,
+  // and served from this origin so no third party learns who visits.
   return (
     <Image
-      src={LOGO_URL}
-      alt="Ferry logo"
-      width={32}
-      height={32}
-      className="rounded-lg object-cover"
+      src={withBasePath("/logo.png")}
+      alt=""
+      width={28}
+      height={28}
+      className="h-7 w-7 rounded-lg"
       priority
+      unoptimized
     />
   );
 }

@@ -1,13 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, JetBrains_Mono, Public_Sans } from "next/font/google";
+
+import { basePath, pageUrl, siteUrl } from "./site";
 import "./globals.css";
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://ferry-share.github.io";
-const pageUrl = `${siteUrl}${basePath || "/"}`;
-const logoUrl =
-  "https://res.cloudinary.com/dkj22lm1g/image/upload/v1788291772/Ferry_zs4ns4.webp";
+
+/**
+ * Everything the page references is served from this origin. A logo pulled
+ * from someone else's CDN would hand that CDN the address of every visitor,
+ * which is a strange thing to do on a page promising it keeps no record of
+ * anyone. `npm run icons` regenerates these from assets/logo.png.
+ */
+const asset = (file: string) => `${basePath}/${file}`;
+const socialCard = `${siteUrl}${asset("opengraph-image.png")}`;
 
 const display = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -44,19 +49,19 @@ export const metadata: Metadata = {
     "Ferry Sri Lanka",
   ],
   applicationName: "Ferry",
-  alternates: {
-    canonical: basePath || "/",
-    languages: {
-      "en-LK": basePath || "/",
-      "si-LK": basePath || "/",
-      "ta-LK": basePath || "/",
-    },
-  },
+  // No `languages` here: hreflang alternates would be claiming Sinhala and
+  // Tamil versions of the page, and both would serve the same English one.
+  alternates: { canonical: basePath || "/" },
   manifest: `${basePath}/manifest.webmanifest`,
   icons: {
-    icon: [logoUrl, `${basePath}/icon.svg`],
-    apple: logoUrl,
-    shortcut: logoUrl,
+    icon: [
+      { url: asset("icon-32.png"), sizes: "32x32", type: "image/png" },
+      { url: asset("icon-192.png"), sizes: "192x192", type: "image/png" },
+      { url: asset("icon-512.png"), sizes: "512x512", type: "image/png" },
+    ],
+    // iOS reads neither WebP nor SVG here, so this one has to be a PNG.
+    apple: { url: asset("apple-touch-icon.png"), sizes: "180x180" },
+    shortcut: asset("favicon.ico"),
   },
   openGraph: {
     title: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
@@ -66,14 +71,23 @@ export const metadata: Metadata = {
     url: pageUrl,
     siteName: "Ferry Sri Lanka",
     locale: "en_LK",
-    images: [{ url: logoUrl, width: 1200, height: 630, alt: "Ferry Sri Lanka logo" }],
+    // 1200x630 is the ratio every platform crops to, and the card really is
+    // that size — declaring it for a square image gets the artwork cropped.
+    images: [
+      {
+        url: socialCard,
+        width: 1200,
+        height: 630,
+        alt: "Ferry — hand a password, a paragraph or a file to your other device.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
     description:
       "Private file and text sharing for Sri Lankan users. End-to-end encrypted, account-free, and instant across devices.",
-    images: [logoUrl],
+    images: [socialCard],
   },
   category: "technology",
   robots: { index: true, follow: true },
@@ -107,12 +121,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     url: pageUrl,
     applicationCategory: "UtilitiesApplication",
     operatingSystem: "Web Browser",
-    inLanguage: ["en-LK", "si-LK", "ta-LK"],
-    areaServed: {
-      "@type": "Country",
-      name: "Sri Lanka",
-    },
-    image: logoUrl,
+    browserRequirements: "Requires WebCrypto and WebRTC. Chrome, Edge, Firefox or Safari.",
+    // English only. Listing si-LK and ta-LK would be describing translations
+    // that do not exist.
+    inLanguage: "en",
+    areaServed: { "@type": "Country", name: "Sri Lanka" },
+    // Free, and saying so is what lets search engines show it as free rather
+    // than leaving the price unknown.
+    offers: { "@type": "Offer", price: 0, priceCurrency: "LKR" },
+    isAccessibleForFree: true,
+    image: socialCard,
     description:
       "Secure device-to-device transfer for files, text, and passwords with end-to-end encryption.",
   };
