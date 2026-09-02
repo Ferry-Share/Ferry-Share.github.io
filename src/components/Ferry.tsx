@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/hooks/useSession";
 import { normalizePin, PIN_LENGTH } from "@/lib/crypto";
@@ -67,7 +68,7 @@ function Shell() {
   const connected = state.phase === "ready";
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-12 sm:px-6">
+    <>
       <Header onOpenSettings={() => setSettingsOpen(true)} />
 
       <main className="flex-1">
@@ -77,14 +78,13 @@ function Shell() {
           <>
             {state.phase === "idle" || state.phase === "ended" ? <Hero /> : null}
             <Pairing session={session} state={state} autoPin={autoPin} />
-            {state.phase === "idle" || state.phase === "ended" ? <HowItWorks /> : null}
           </>
         )}
       </main>
 
-      <Footer onOpenSettings={() => setSettingsOpen(true)} />
+      <AppFooter onOpenSettings={() => setSettingsOpen(true)} />
       <Settings open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    </div>
+    </>
   );
 }
 
@@ -178,62 +178,25 @@ function Hero() {
   );
 }
 
-function HowItWorks() {
-  const steps = [
-    {
-      title: "One device opens a crossing",
-      body: "It mints a ten character code and shows it as a QR. The code is the only secret, and it never reaches a server — the relay only ever sees a hash of it.",
-    },
-    {
-      title: "The other device reads the code",
-      body: "Both browsers generate a throwaway key pair and agree on a shared key. Because the agreement is salted with the code, a relay that tried to insert itself would end up with a different key and be caught immediately.",
-    },
-    {
-      title: "Both screens show four words",
-      body: "Those words come from the agreed key. Matching words on both devices mean nobody is in the middle.",
-    },
-    {
-      title: "The data goes straight across",
-      body: "On the same network the bytes travel device to device and never touch the relay at all. When a network blocks that, the same encrypted frames are forwarded instead — the relay still cannot read them.",
-    },
-  ];
-
+/**
+ * The bar under the app itself. The page's own footer, with the links to the
+ * written pages, sits below the prose further down — this one only carries
+ * what belongs to the running app.
+ */
+function AppFooter({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
-    <section className="mt-14">
-      <h2 className="text-2xl font-semibold">How a crossing works</h2>
-      <ol className="mt-6 grid gap-x-8 gap-y-7 sm:grid-cols-2">
-        {steps.map((step, index) => (
-          <li key={step.title} className="flex gap-4">
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-hull-900 font-mono text-[13px] font-bold text-signal-400 dark:bg-hull-800">
-              {index + 1}
-            </span>
-            <div>
-              <h3 className="text-[15px] font-semibold">{step.title}</h3>
-              <p className="mt-1 text-[14.5px] text-hull-600 dark:text-hull-300">
-                {step.body}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
-
-function Footer({ onOpenSettings }: { onOpenSettings: () => void }) {
-  return (
-    <footer className="mt-14 flex flex-col gap-3 border-t border-hull-200/70 pt-6 text-[13.5px] text-hull-500 sm:flex-row sm:items-center sm:justify-between dark:border-hull-800 dark:text-hull-400">
+    <div className="mt-14 flex flex-col gap-3 border-t border-hull-200/70 pt-6 text-[13.5px] text-hull-500 sm:flex-row sm:items-center sm:justify-between dark:border-hull-800 dark:text-hull-400">
       <p>
         Ferry keeps no accounts, no logs and no copies. Close the tab and the
         session is gone.
       </p>
       <div className="flex flex-wrap items-center gap-4">
-        <a href="/how-it-works/" className="hover:underline">
+        <Link href="/how-it-works/" className="hover:underline">
           How it works
-        </a>
-        <a href="/about/" className="hover:underline">
-          About
-        </a>
+        </Link>
+        <Link href="/faq/" className="hover:underline">
+          FAQ
+        </Link>
         <button
           type="button"
           onClick={onOpenSettings}
@@ -242,7 +205,7 @@ function Footer({ onOpenSettings }: { onOpenSettings: () => void }) {
           Relay and network settings
         </button>
       </div>
-    </footer>
+    </div>
   );
 }
 

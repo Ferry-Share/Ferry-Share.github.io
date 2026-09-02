@@ -13,8 +13,10 @@ import { withBasePath } from "@/lib/config";
  * so a crawler sees prose rather than a loading bar.
  */
 
-const NAV = [
+export const NAV = [
   { href: "/how-it-works/", label: "How it works" },
+  { href: "/faq/", label: "FAQ" },
+  { href: "/compare/", label: "Compare" },
   { href: "/about/", label: "About" },
 ];
 
@@ -36,7 +38,7 @@ function SiteHeader({ current }: { current?: string }) {
         </span>
       </Link>
 
-      <nav className="flex items-center gap-1 text-[14.5px]" aria-label="Pages">
+      <nav className="flex flex-wrap items-center gap-1 text-[14.5px]" aria-label="Pages">
         {NAV.map((item) => (
           <Link
             key={item.href}
@@ -62,7 +64,7 @@ function SiteHeader({ current }: { current?: string }) {
   );
 }
 
-function SiteFooter() {
+export function SiteFooter() {
   return (
     <footer className="mt-16 flex flex-col gap-3 border-t border-hull-200/70 pt-6 text-[13.5px] text-hull-500 sm:flex-row sm:items-center sm:justify-between dark:border-hull-800 dark:text-hull-400">
       <p>Ferry keeps no accounts, no logs and no copies.</p>
@@ -81,6 +83,27 @@ function SiteFooter() {
         </a>
       </div>
     </footer>
+  );
+}
+
+/**
+ * The visible trail back to the front page. It pairs with the BreadcrumbList
+ * structured data each page emits: one for people, one for crawlers, saying
+ * the same thing.
+ */
+export function Breadcrumbs({ here }: { here: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className="pt-1 text-[13.5px] text-hull-500 dark:text-hull-400">
+      <ol className="flex flex-wrap items-center gap-1.5">
+        <li>
+          <Link href="/" className="hover:underline">
+            Ferry
+          </Link>
+        </li>
+        <li aria-hidden="true">/</li>
+        <li className="text-hull-700 dark:text-hull-200">{here}</li>
+      </ol>
+    </nav>
   );
 }
 
@@ -104,12 +127,14 @@ export function SiteChrome({
 export function Section({
   title,
   children,
+  id,
 }: {
   title: string;
   children: ReactNode;
+  id?: string;
 }) {
   return (
-    <section className="mt-12 first:mt-0">
+    <section id={id} className="mt-12 first:mt-0">
       <h2 className="text-[22px] font-semibold sm:text-2xl">{title}</h2>
       <div className="mt-3 space-y-4 text-[15.5px] leading-[1.75] text-hull-700 dark:text-hull-200">
         {children}

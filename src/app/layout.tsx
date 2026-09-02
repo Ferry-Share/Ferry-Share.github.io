@@ -1,7 +1,20 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, JetBrains_Mono, Public_Sans } from "next/font/google";
 
-import { basePath, pageUrl, siteUrl } from "./site";
+import { JsonLd } from "@/components/JsonLd";
+import {
+  authorName,
+  authorUrl,
+  basePath,
+  featureList,
+  pageUrl,
+  pathFor,
+  repoUrl,
+  siteName,
+  siteUrl,
+  summary,
+  urlFor,
+} from "./site";
 import "./globals.css";
 
 
@@ -35,26 +48,45 @@ const mono = JetBrains_Mono({
   display: "swap",
 });
 
+/**
+ * One title, used by the tab, the search result and every social preview.
+ * It leads with the problem people search for rather than the product name,
+ * because nobody looks for a tool they have not heard of by its name.
+ */
+const title = "Ferry — Secure, Private File Sharing Between Your Devices";
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: {
-    default: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
-    template: "%s — Ferry",
-  },
-  description:
-    "Ferry is a fast, secure file sharing app for Sri Lanka. Move passwords, text, and files between your devices with end-to-end encryption and no account required.",
+  title: { default: title, template: "%s — Ferry" },
+  description: summary,
   keywords: [
-    "Sri Lanka file sharing",
-    "secure file transfer Sri Lanka",
-    "device to device transfer",
-    "encrypted file sharing",
+    "secure file sharing",
+    "encrypted file transfer",
+    "peer to peer file transfer",
     "send files phone to laptop",
-    "Ferry Sri Lanka",
+    "share files between devices",
+    "end-to-end encrypted file sharing",
+    "file sharing without account",
+    "private file transfer",
+    "send a password securely",
+    "browser to browser file transfer",
+    "WebRTC file transfer",
+    "open source file sharing",
+    "AirDrop alternative for Android and Windows",
+    "WeTransfer alternative",
+    // Ferry is built in Sri Lanka and used there; the tool itself is not
+    // regional, so these sit alongside the general terms rather than in the
+    // title, where they would narrow what the page appears to be for.
+    "secure file sharing Sri Lanka",
+    "file transfer app Sri Lanka",
   ],
-  applicationName: "Ferry",
-  // No `languages` here: hreflang alternates would be claiming Sinhala and
-  // Tamil versions of the page, and both would serve the same English one.
-  alternates: { canonical: basePath || "/" },
+  applicationName: siteName,
+  authors: [{ name: authorName, url: authorUrl }],
+  creator: authorName,
+  publisher: siteName,
+  // No `languages` here: hreflang alternates would be claiming translations
+  // of this page, and every one of them would serve the same English text.
+  alternates: { canonical: pathFor("/") },
   manifest: `${basePath}/manifest.webmanifest`,
   icons: {
     icon: [
@@ -67,16 +99,12 @@ export const metadata: Metadata = {
     shortcut: asset("favicon.ico"),
   },
   openGraph: {
-    title: {
-    default: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
-    template: "%s — Ferry",
-  },
-    description:
-      "Securely transfer files, text, and passwords between your devices in Sri Lanka with Ferry. End-to-end encrypted and no data stored.",
+    title: { default: title, template: "%s — Ferry" },
+    description: summary,
     type: "website",
     url: pageUrl,
-    siteName: "Ferry Sri Lanka",
-    locale: "en_LK",
+    siteName,
+    locale: "en_US",
     // 1200x630 is the ratio every platform crops to, and the card really is
     // that size — declaring it for a square image gets the artwork cropped.
     images: [
@@ -91,16 +119,24 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: {
-    default: "Ferry Sri Lanka — Secure Device-to-Device File Transfer",
-    template: "%s — Ferry",
-  },
-    description:
-      "Private file and text sharing for Sri Lankan users. End-to-end encrypted, account-free, and instant across devices.",
+    title: { default: title, template: "%s — Ferry" },
+    description: summary,
     images: [socialCard],
   },
   category: "technology",
-  robots: { index: true, follow: true },
+  // `max-snippet` and `max-image-preview` are what let a search engine — and
+  // the assistants that read its index — quote more than a clipped line.
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
+  },
 };
 
 export const viewport: Viewport = {
@@ -123,40 +159,84 @@ try {
 } catch (e) {}
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    name: "Ferry Sri Lanka",
-    url: pageUrl,
-    applicationCategory: "UtilitiesApplication",
-    operatingSystem: "Web Browser",
-    browserRequirements: "Requires WebCrypto and WebRTC. Chrome, Edge, Firefox or Safari.",
-    // English only. Listing si-LK and ta-LK would be describing translations
-    // that do not exist.
-    inLanguage: "en",
-    areaServed: { "@type": "Country", name: "Sri Lanka" },
-    // Free, and saying so is what lets search engines show it as free rather
-    // than leaving the price unknown.
-    offers: { "@type": "Offer", price: 0, priceCurrency: "LKR" },
-    isAccessibleForFree: true,
-    image: socialCard,
-    description:
-      "Secure device-to-device transfer for files, text, and passwords with end-to-end encryption.",
-  };
+/**
+ * What the whole site is, in the vocabulary crawlers parse rather than the
+ * prose they have to interpret.
+ *
+ * The nodes reference each other by `@id`, which is what turns four separate
+ * claims into one description of a single thing. Everything here is checked
+ * against the app: there is no rating, because nobody has rated it, and no
+ * download count, because none is counted.
+ */
+const graph = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${pageUrl}#website`,
+      url: pageUrl,
+      name: siteName,
+      description: summary,
+      inLanguage: "en",
+      publisher: { "@id": `${pageUrl}#author` },
+    },
+    {
+      "@type": "Person",
+      "@id": `${pageUrl}#author`,
+      name: authorName,
+      url: authorUrl,
+      sameAs: [authorUrl, repoUrl],
+    },
+    {
+      "@type": ["WebApplication", "SoftwareApplication"],
+      "@id": `${pageUrl}#app`,
+      name: siteName,
+      alternateName: "Ferry Share",
+      url: pageUrl,
+      description:
+        "Ferry is a free, open-source web app that transfers passwords, text and " +
+        "files directly between two devices over an end-to-end encrypted " +
+        "peer-to-peer connection. It requires no account, uploads nothing to a " +
+        "server and stores nothing after the tab closes.",
+      applicationCategory: "SecurityApplication",
+      applicationSubCategory: "File Sharing",
+      operatingSystem: "Any (web browser): Windows, macOS, Linux, Android, iOS",
+      browserRequirements: "Requires WebCrypto and WebRTC. Chrome, Edge, Firefox or Safari.",
+      // English only. Listing translations that do not exist misleads both
+      // crawlers and the people they send here.
+      inLanguage: "en",
+      areaServed: "Worldwide",
+      // Free, and saying so is what lets a search engine show it as free
+      // rather than leaving the price unknown.
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+      },
+      isAccessibleForFree: true,
+      featureList,
+      license: `${repoUrl}/blob/main/LICENSE`,
+      softwareHelp: { "@type": "CreativeWork", url: urlFor("/how-it-works/") },
+      codeRepository: repoUrl,
+      author: { "@id": `${pageUrl}#author` },
+      maintainer: { "@id": `${pageUrl}#author` },
+      image: socialCard,
+      screenshot: socialCard,
+      sameAs: [repoUrl],
+      // Stated plainly because it is the question every reader of this page
+      // actually has, and a crawler cannot infer it from marketing copy.
+      privacyPolicy: urlFor("/about/"),
+    },
+  ],
+};
 
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-LK" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
-        <meta name="geo.region" content="LK" />
-        <meta name="geo.placename" content="Sri Lanka" />
-        <meta name="language" content="English" />
-        <meta name="distribution" content="global" />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <JsonLd data={graph} />
       </head>
       <body className={`${display.variable} ${body.variable} ${mono.variable}`}>
         {children}

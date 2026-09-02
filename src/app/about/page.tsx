@@ -1,24 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Lede, Section, SiteChrome } from "@/components/SiteChrome";
-import { basePath, pageUrl, repoUrl } from "../site";
+import { Breadcrumbs, Lede, Section, SiteChrome } from "@/components/SiteChrome";
+import { JsonLd, breadcrumbs } from "@/components/JsonLd";
+import { authorName, authorUrl, pageUrl, pathFor, repoUrl, siteUrl, urlFor } from "../site";
 
-const title = "About Ferry";
+const seoTitle = "About Ferry — Who Built It and What It Promises";
 const description =
   "Why Ferry exists, what it refuses to do with your data, and who is behind it. Free, open source, and built so that trusting the operator is not part of the deal.";
 
 export const metadata: Metadata = {
-  title,
+  title: { absolute: seoTitle },
   description,
-  alternates: { canonical: `${basePath}/about/` },
+  alternates: { canonical: pathFor("/about/") },
   openGraph: {
-    title: `${title} — Ferry`,
+    title: seoTitle,
     description,
-    url: `${pageUrl}about/`,
+    url: urlFor("/about/"),
     type: "article",
   },
-  twitter: { card: "summary_large_image", title: `${title} — Ferry`, description },
+  twitter: { card: "summary_large_image", title: seoTitle, description },
 };
 
 const promises = [
@@ -41,10 +42,47 @@ const promises = [
 ];
 
 export default function About() {
+  /**
+   * This page doubles as the privacy statement — the structured data in the
+   * layout points at it as one — so it is marked up as both, and the four
+   * promises are listed where a crawler can read them as claims rather than
+   * having to infer them from prose.
+   */
+  const aboutPage = {
+    "@context": "https://schema.org",
+    "@type": ["AboutPage", "PrivacyPolicy"],
+    "@id": `${urlFor("/about/")}#about`,
+    name: "About Ferry",
+    description,
+    inLanguage: "en",
+    isPartOf: { "@id": `${pageUrl}#website` },
+    about: { "@id": `${pageUrl}#app` },
+    author: { "@type": "Person", name: authorName, url: authorUrl },
+    mainEntity: {
+      "@type": "ItemList",
+      name: "What Ferry promises",
+      itemListElement: promises.map((promise, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: promise.title,
+        description: promise.body,
+      })),
+    },
+  };
+
   return (
     <SiteChrome current="/about/">
+      <JsonLd data={aboutPage} />
+      <JsonLd
+        data={breadcrumbs(siteUrl, [
+          { name: "Ferry", url: pageUrl },
+          { name: "About", url: urlFor("/about/") },
+        ])}
+      />
+
       <article className="pb-4 pt-2">
-        <h1 className="max-w-[18ch] text-[36px] font-bold leading-[1.1] sm:text-[46px]">
+        <Breadcrumbs here="About" />
+        <h1 className="mt-3 max-w-[18ch] text-[36px] font-bold leading-[1.1] sm:text-[46px]">
           About Ferry
         </h1>
         <Lede>

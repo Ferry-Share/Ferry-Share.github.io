@@ -1,24 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Lede, Section, SiteChrome } from "@/components/SiteChrome";
-import { basePath, pageUrl, repoUrl } from "../site";
+import { Breadcrumbs, Lede, Section, SiteChrome } from "@/components/SiteChrome";
+import { JsonLd, breadcrumbs } from "@/components/JsonLd";
+import { authorName, authorUrl, pageUrl, pathFor, repoUrl, siteUrl, urlFor } from "../site";
 
-const title = "How Ferry works";
+/** The tab and the search result. The template title would read "How Ferry
+ *  works — Ferry", which spends its most valuable characters saying the same
+ *  word twice. */
+const seoTitle = "How Ferry Works — Encryption, Pairing and Threat Model";
 const description =
-  "The ten-character code, the key agreement it anchors, the four safety words, and why the relay in the middle cannot read anything it carries.";
+  "The ten-character pairing code, the ECDH key agreement it anchors, AES-256-GCM frames, the four safety words, and why the relay cannot read what it carries.";
 
 export const metadata: Metadata = {
-  title,
+  title: { absolute: seoTitle },
   description,
-  alternates: { canonical: `${basePath}/how-it-works/` },
+  alternates: { canonical: pathFor("/how-it-works/") },
   openGraph: {
-    title: `${title} — Ferry`,
+    title: seoTitle,
     description,
-    url: `${pageUrl}how-it-works/`,
+    url: urlFor("/how-it-works/"),
     type: "article",
   },
-  twitter: { card: "summary_large_image", title: `${title} — Ferry`, description },
+  twitter: { card: "summary_large_image", title: seoTitle, description },
 };
 
 const steps = [
@@ -55,10 +59,46 @@ const steps = [
 ];
 
 export default function HowItWorks() {
+  /**
+   * A HowTo, because that is what the page is: six ordered steps that take
+   * someone from two unpaired browsers to an encrypted channel. The step text
+   * is the same text on the page.
+   */
+  const howTo = {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "@id": `${urlFor("/how-it-works/")}#howto`,
+    name: "How to pair two devices and transfer a file end-to-end encrypted",
+    description,
+    inLanguage: "en",
+    totalTime: "PT1M",
+    estimatedCost: { "@type": "MonetaryAmount", currency: "USD", value: "0" },
+    supply: [{ "@type": "HowToSupply", name: "Two devices with a modern web browser" }],
+    tool: [{ "@type": "HowToTool", name: "Ferry (free web app)" }],
+    about: { "@id": `${pageUrl}#app` },
+    author: { "@type": "Person", name: authorName, url: authorUrl },
+    step: steps.map((step) => ({
+      "@type": "HowToStep",
+      position: Number(step.n),
+      name: step.title,
+      text: step.body,
+      url: `${urlFor("/how-it-works/")}#step-${step.n}`,
+    })),
+  };
+
   return (
     <SiteChrome current="/how-it-works/">
+      <JsonLd data={howTo} />
+      <JsonLd
+        data={breadcrumbs(siteUrl, [
+          { name: "Ferry", url: pageUrl },
+          { name: "How it works", url: urlFor("/how-it-works/") },
+        ])}
+      />
+
       <article className="pb-4 pt-2">
-        <h1 className="max-w-[18ch] text-[36px] font-bold leading-[1.1] sm:text-[46px]">
+        <Breadcrumbs here="How it works" />
+        <h1 className="mt-3 max-w-[18ch] text-[36px] font-bold leading-[1.1] sm:text-[46px]">
           How Ferry works
         </h1>
         <Lede>
@@ -71,7 +111,7 @@ export default function HowItWorks() {
         <Section title="A crossing, step by step">
           <ol className="mt-2 space-y-6">
             {steps.map((step) => (
-              <li key={step.n} className="flex gap-4">
+              <li key={step.n} id={`step-${step.n}`} className="flex gap-4">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-hull-900 font-mono text-[13px] font-bold text-signal-400 dark:bg-hull-800">
                   {step.n}
                 </span>
