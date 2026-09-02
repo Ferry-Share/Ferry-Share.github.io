@@ -16,10 +16,7 @@ const nextConfig = {
   assetPrefix: basePath || undefined,
   trailingSlash: true,
   reactStrictMode: true,
-  images: {
-    unoptimized: true,
-    remotePatterns: [{ protocol: "https", hostname: "res.cloudinary.com" }],
-  },
+  images: { unoptimized: true },
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
 };
 

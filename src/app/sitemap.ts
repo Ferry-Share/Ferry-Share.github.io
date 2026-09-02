@@ -1,16 +1,11 @@
 import type { MetadataRoute } from "next";
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://ferry-share.github.io";
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+import { pageUrl } from "./site";
+
+export const dynamic = "force-static";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: `${siteUrl}${basePath || "/"}`,
-      changeFrequency: "weekly",
-      priority: 1,
-      lastModified: new Date(),
-    },
-  ];
+  // One page, and no `lastModified`: stamping every build with the current
+  // time tells crawlers the content changed when only the build did.
+  return [{ url: pageUrl, changeFrequency: "monthly", priority: 1 }];
 }

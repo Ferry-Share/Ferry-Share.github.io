@@ -8,11 +8,12 @@
     "dev:relay": "node server/relay.js",
     "build": "next build",
     "postbuild": "node scripts/postbuild.js",
+    "icons": "node scripts/generate-icons.mjs",
     "lan": "npm run build && node server/lan.js",
     "relay": "node server/relay.js",
     "start": "node server/relay.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test test/config.test.mjs test/crypto.test.mjs test/lan.test.js test/relay.test.js test/worker.test.mjs",
+    "test": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --test test/config.test.mjs test/crypto.test.mjs test/lan.test.js test/relay.test.js test/seo.test.mjs test/worker.test.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -33,6 +34,7 @@
     "qrcode": "1.5.4",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "sharp": "0.35.4",
     "tailwindcss": "3.4.17",
     "typescript": "5.7.3"
   },

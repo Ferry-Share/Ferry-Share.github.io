@@ -70,7 +70,10 @@ test(
     await t.test("a real asset is served", async () => {
       const response = await rawGet(port, "/robots.txt");
       assert.equal(response.status, 200);
-      assert.match(response.body, /User-agent/);
+      // Case-insensitive: the field name is, per the robots.txt convention,
+      // and whether this file is written by hand or generated is not what
+      // this test is about.
+      assert.match(response.body, /user-agent/i);
     });
 
     await t.test("climbing out of the build directory is refused", async () => {
